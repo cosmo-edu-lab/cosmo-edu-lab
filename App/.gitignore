@@ -1,0 +1,23 @@
+# Ambienti virtuali e cache
+venv/
+App/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# File e cartelle locali
+.DS_Store
+.vscode/
+.idea/
+node_modules/
+
+# Cartelle di test o pulizia
+Cosmo-Edu_Lab_clean/
+Cosmo-Edu_Lab_test/
+
+# File temporanei
+*.tmp
+*.bak
+app_data.json

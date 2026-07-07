@@ -1,0 +1,33 @@
+# Web Framework & UI
+nicegui==2.24.2
+fastapi
+uvicorn
+python-dotenv
+
+# Hugging Face & AI APIs
+huggingface_hub
+groq
+google-genai
+requests
+
+# Scientific Calculation & Astronomy
+numpy
+pandas
+scipy
+astropy
+astroquery
+pyvo
+regions
+mocpy
+networkx
+
+# Plotting & Imaging
+matplotlib
+plotly
+pillow
+imageio
+
+# Utilities & Parsing
+pypdf
+latex2mathml
+numexpr

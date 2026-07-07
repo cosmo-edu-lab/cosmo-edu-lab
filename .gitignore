@@ -1,0 +1,14 @@
+# File sensibili e locali
+.env
+*.log
+App/venv
+__pycache__/
+*.pyc
+*.ipynb_checkpoints/
+.DS_Store
+.vscode/
+.idea/
+App.env.txt
+App/data/galaxy_SDSS.csv
+App/data/sdss_gal_morfo.txt
+App/data/GaiaSource.csv
