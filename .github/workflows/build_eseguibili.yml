@@ -1,15 +1,17 @@
 name: Compila Cosmo-Edu-Lab (Win, Mac, Linux)
 
-
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
+
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build su ${{ matrix.os }}
-  
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -38,3 +40,25 @@ jobs:
       with:
         name: CosmoEduLab-${{ matrix.os }}
         path: dist/*
+
+  
+  release:
+    name: Pubblica la Release
+    needs: build 
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Raccogli tutti gli eseguibili generati
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true 
+
+      - name: 2. Aggiorna la Release in automatico
+        uses: ncipollo/release-action@v1
+        with:
+          tag: "latest"
+          name: "Cosmo-Edu Lab (Ultima Versione)"
+          body: "Questi eseguibili vengono rigenerati automaticamente a ogni aggiornamento del codice."
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: "dist/*"
