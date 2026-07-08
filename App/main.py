@@ -10,17 +10,17 @@ import sys
 sys.path.append(current_dir)
 #from nicegui_toolkit import inject_layout_tool
 from huggingface_hub import HfApi
-if sys.stdout is None:
-    class NullIO:
-        def write(self, text):
-            pass
-        def flush(self):
-            pass
-        def isatty(self):
-            return False
+#if sys.stdout is None:
+#    class NullIO:
+#        def write(self, text):
+#            pass
+#        def flush(self):
+#            pass
+#        def isatty(self):
+#            return False
     
-    sys.stdout = NullIO()
-    sys.stderr = NullIO()
+#    sys.stdout = NullIO()
+#    sys.stderr = NullIO()
 
 if not hasattr(ui, '_original_add_head'):
     ui._original_add_head = ui.add_head_html
