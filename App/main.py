@@ -100,7 +100,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         reconnect_timeout=30.0,
         binding_refresh_interval=0.1,
         reload=False, 
-        show=True    
+        show=False    
     )
 '''
 SPACE_ID = "CosmoEduLab/Cosmo-Edu" 

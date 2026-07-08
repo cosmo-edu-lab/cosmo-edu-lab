@@ -17,19 +17,12 @@ RUN apt-get update && apt-get install -y \
 EXPOSE 7860
 ENV MPLCONFIGDIR=/tmp/matplotlib
 
-# Il nuovo CMD: controlla se il codice esiste già prima di clonare
-CMD if [ -d ".git" ]; then \
-        echo "Codice già presente, aggiorno all'ultima versione..." && \
-        git fetch --all && \
-        git reset --hard origin/main && \
-        git lfs pull; \
-    else \
-        echo "Cartella vuota, clono il repository..." && \
-        git clone https://$GITHUB_TOKEN@github.com/Elyon7/Cosmo-Edu_Lab.git . && \
-        git lfs pull; \
-    fi && \
+# Cloniamo e installiamo ora, così all'avvio l'app è pronta in 1 secondo
+RUN git clone https://$GITHUB_TOKEN@github.com/Elyon7/Cosmo-Edu_Lab.git . && \
+    git lfs pull && \
     mkdir -p App/student_submissions && \
     chmod 777 App/student_submissions && \
-    pip install --no-cache-dir -r requirements.txt && \
-    cd App && \
-    python main.py
+    pip install --no-cache-dir -r requirements.txt
+
+# Avvio immediato (senza più download)
+CMD ["python", "-u", "App/main.py"]
