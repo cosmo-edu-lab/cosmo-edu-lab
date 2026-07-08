@@ -72,60 +72,115 @@ def create_routes():
             ui.label('\"The cosmos is within us. We are made of star-stuff.\" — Carl Sagan').classes('italic text-3xl text-blue-100 mt-4 font-serif drop-shadow-md text-center ').props(' tabindex=0')
             
 
+            # --- INIZIO NUOVO BLOCCO (sostituisci il vecchio ui.grid e il suo contenuto) ---
+            
+            # Definizione dei pannelli interni per ogni modulo
+            module_panels = {
+                1: [
+                    ('intro', 'Structures of Universe', '🌌'),
+                    ('discovery', 'Discoveries Timeline', '🔭'),
+                    ('universe', 'Universe Evolution', '⏳'),
+                    ('instrument', 'Observational Methods', '📡'),
+                    ('planets', 'Planets', '🪐'),
+                    ('galaxy', 'Galaxies', '🌀'),
+                    ('stars', 'Stars', '✨'),
+                    ('particles', 'Fundamental Particles', '⚛️')
+                ],
+                2: [
+                    ('kepler', 'Kepler laws planets', '🌍'),
+                    ('gal', 'Galaxy rotation curve', '📈'),
+                    ('galdm', 'Galaxy mass & DM', '⚖️'),
+                    ('cluster', 'Cluster velocity', '🚀'),
+                    ('clusdm', 'Cluster mass & DM', '🌌')
+                ]
+            }
+
             with ui.grid(columns=4).classes('w-full justify-center gap-10 mt-8 mb-8 flex-wrap'):
                 module_titles = [
                     "Introduction to Cosmology","Dark Matter","Universe History & CMB" ,"Redshift & Universe Expansion"
                 ]
+                
                 star_style = (
                         'w-72 h-72 rounded-full flex flex-col items-center justify-center text-center p-4 '
                         'cursor-pointer transition-all duration-500 ease-in-out '
-                        'bg-gradient-to-br from-yellow-100 via-yellow-200 to-yellow-500 ' # Effetto rilievo dorato/chiaro
-                        'border-4 border-white/50 ' # Bordo semitrasparente
-                        'shadow-[0_0_40px_rgba(255,223,0,0.6)] ' # Effetto Glow esterno
-                        'hover:scale-110 hover:shadow-[0_0_60px_rgba(255,255,255,0.9)] hover:z-10' # Effetto hover
-                    )
+                        'bg-gradient-to-br from-yellow-100 via-yellow-200 to-yellow-500 ' 
+                        'border-4 border-white/50 ' 
+                        'shadow-[0_0_40px_rgba(255,223,0,0.6)] ' 
+                        'hover:scale-110 hover:shadow-[0_0_60px_rgba(255,255,255,0.9)]' 
+                )
                 
                 for i, title in enumerate(module_titles, 1):
                
                     is_locked = (i in [3, 4]) and MODULES_LOCKED
                     
-                   
                     current_style = star_style
                     if is_locked:
                         current_style = current_style.replace('cursor-pointer', 'cursor-not-allowed') + ' opacity-75 grayscale'
                     
-                
-                    card = ui.card().classes(current_style).props(
-                        f'role=button tabindex=0 aria-label="{"Locked" if is_locked else "Go to"} module {i}: {title}"'
-                    )
-                    
-                   
-                    if is_locked:
-                       
-                        def show_coming_soon(e):
-                            accessible_notify('Module under development: coming soon', type_='warning')
+                    # WRAPPER FONDAMENTALE PER L'EFFETTO HOVER
+                    with ui.element('div').classes('relative group flex flex-col items-center z-10 hover:z-50'):
+
+                        card = ui.card().classes(current_style).props(
+                            f'role=button tabindex=0 aria-label="{"Locked" if is_locked else "Go to"} module {i}: {title}"'
+                        )
                         
-                        card.on('click', show_coming_soon)
-                        card.on('keydown.enter', show_coming_soon)
-                    else:
-                   
-                        card.on('click', lambda i=i: (
-                            ui.navigate.to(f'/module{i}'), 
-                            ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
-                        ))
-                        card.on('keydown.enter', lambda i=i: (
-                            ui.navigate.to(f'/module{i}'), 
-                            ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
-                        ))
-                    
-                    with card: 
-                       
                         if is_locked:
-                            ui.label('🔒').classes('text-6xl absolute top-4 opacity-50')
+                            def show_coming_soon(e):
+                                accessible_notify('Module under development: coming soon', type_='warning')
+                            card.on('click', show_coming_soon)
+                            card.on('keydown.enter', show_coming_soon)
                         else:
-                            ui.label(f'{i}').classes('text-6xl font-black text-yellow-600/30 absolute top-4')
+                            card.on('click', lambda i=i: (
+                                ui.navigate.to(f'/module{i}'), 
+                                ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
+                            ))
+                            card.on('keydown.enter', lambda i=i: (
+                                ui.navigate.to(f'/module{i}'), 
+                                ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
+                            ))
                         
-                        ui.label(title).classes('text-2xl font-semibold text-slate-800 leading-tight')
+                        with card: 
+                            if is_locked:
+                                ui.label('🔒').classes('text-6xl absolute top-4 opacity-50')
+                            else:
+                                ui.label(f'{i}').classes('text-6xl font-black text-yellow-600/30 absolute top-4')
+                            
+                            ui.label(title).classes('text-2xl font-semibold text-slate-800 leading-tight')
+
+                        # MENU A TENDINA (Visibile solo in hover)
+                        if i in module_panels and not is_locked:
+                            with ui.column().classes(
+                                "absolute top-[95%] w-72 hidden group-hover:flex flex-col gap-2 p-4 "
+                                "bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-blue-400/40 "
+                                "shadow-[0_20px_50px_rgba(0,0,0,0.8)] transition-all duration-300 "
+                                "opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100"
+                            ):
+                                # Freccetta stile "fumetto"
+                                ui.element('div').classes("absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-slate-900 rotate-45 border-t border-l border-blue-400/40")
+                                
+                                ui.label('Quick Access').classes('text-blue-300 text-xs font-bold uppercase tracking-widest text-center w-full mb-1 border-b border-blue-500/30 pb-2')
+                                
+                                # Setup variabile memoria a seconda del modulo
+                                tab_storage_key = 'module1_selected' if i == 1 else 'module2_selected'
+                                
+                                for tab_val, tab_label, icon in module_panels[i]:
+                                    def create_nav_handler(mod_idx, tk, tv):
+                                        def handler():
+                                            app.storage.user[tk] = tv
+                                            ui.navigate.to(f'/module{mod_idx}')
+                                            ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
+                                        return handler
+
+                                    ui.button(
+                                        f"{icon} {tab_label}", 
+                                        on_click=create_nav_handler(i, tab_storage_key, tab_val)
+                                    ).classes(
+                                        'w-full !bg-blue-800/30 hover:!bg-blue-600/60 text-blue-100 '
+                                        'font-semibold border border-blue-500/20 rounded-lg '
+                                        'transition-all duration-200 text-sm px-4 py-2 flex justify-start text-left'
+                                    ).props('flat no-caps')
+            
+       
                 
       
             
