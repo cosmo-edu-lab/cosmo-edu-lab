@@ -10,17 +10,17 @@ import sys
 sys.path.append(current_dir)
 #from nicegui_toolkit import inject_layout_tool
 from huggingface_hub import HfApi
-#if sys.stdout is None:
-#    class NullIO:
-#        def write(self, text):
-#            pass
-#        def flush(self):
-#            pass
-#        def isatty(self):
-#            return False
+if sys.stdout is None:
+    class NullIO:
+        def write(self, text):
+            pass
+        def flush(self):
+            pass
+        def isatty(self):
+            return False
     
-#    sys.stdout = NullIO()
-#    sys.stderr = NullIO()
+    sys.stdout = NullIO()
+    sys.stderr = NullIO()
 
 if not hasattr(ui, '_original_add_head'):
     ui._original_add_head = ui.add_head_html
@@ -100,7 +100,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         reconnect_timeout=30.0,
         binding_refresh_interval=0.1,
         reload=False, 
-        show=False    
+        show=True    
     )
 '''
 SPACE_ID = "CosmoEduLab/Cosmo-Edu" 
