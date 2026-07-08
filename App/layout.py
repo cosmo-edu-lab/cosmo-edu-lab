@@ -1618,10 +1618,9 @@ def main_layout(title: str):
                 
             
                 ui.mermaid('''
-                    graph TD
+     graph TD
     Root("Cosmo-Edu Lab "):::rootClass
     
-    %% --- Modulo 1: Introduction (Dichiarato per primo) ---
     Mod1("Introduction to Cosmology"):::modClass
     IC1("<b>IC.1</b> Structures of the Universe"):::panelClass
     IC2("<b>IC.2</b> Astronomical Discoveries"):::panelClass
@@ -1632,7 +1631,6 @@ def main_layout(title: str):
     IC7("<b>IC.7</b> Stars"):::panelClass
     IC8("<b>IC.8</b> Fundamental Particles"):::panelClass
     
-    %% --- Modulo 2: Dark Matter (Dichiarato dopo) ---
     Mod2("Dark Matter (DM)"):::modClass
     DM1("<b>DM.1</b> Kepler's Laws"):::panelClass
     DM2("<b>DM.2</b> Galaxy Rotation Curves"):::panelClass
@@ -1640,30 +1638,32 @@ def main_layout(title: str):
     DM4("<b>DM.4</b> Cluster Velocity"):::panelClass
     DM5("<b>DM.5</b> Cluster Mass and DM"):::panelClass
     
-    %% --- Connessioni (L'ordine qui forza il layout) ---
+    %% --- Connessioni principali ---
     Root --> Mod1
     Root --> Mod2
     
     Mod1 --> IC1 --> IC2 --> IC3 --> IC4 --> IC5 --> IC6 --> IC7 --> IC8
     Mod2 --> DM1 --> DM2 --> DM3 --> DM4 --> DM5
     
-    %% --- Elementi extra ---
+    %% --- Moduli Pianificati ---
     subgraph Planned [Planned Modules]
         PM1("Redshift and<br>Universe Expansion"):::futureClass
         PM2("Universe History<br>and CMB"):::futureClass
-        PM1 -.- PM2
     end
+    
+    %% --- IL TRUCCO DEI COLLEGAMENTI INVISIBILI ---
+    %% 1. Diciamo a PM1 di stare sotto DM5 (senza freccia)
     DM5 ~~~ PM1
+    %% 2. Diciamo a PM2 di stare sotto PM1 (senza freccia)
+    PM1 ~~~ PM2
     
     %% --- Stili ---
     classDef rootClass fill:#dbeafe,stroke:#1e40af,stroke-width:2px,color:#000,font-weight:bold,font-size:16px,rx:10px,ry:10px
     classDef modClass fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000,font-weight:bold,rx:8px,ry:8px
     classDef panelClass fill:#ffedd5,stroke:#c2410c,stroke-width:1px,color:#000,rx:5px,ry:5px
     classDef futureClass fill:#f3f4f6,stroke:#9ca3af,stroke-width:1px,stroke-dasharray: 5 5,color:#6b7280,font-weight:bold
-    style Planned fill:transparent,stroke:#9ca3af,stroke-width:2px,stroke-dasharray: 5 5,color:#6b7280,font-weight:bold ''')
-                
-            
-                
+    style Planned fill:transparent,stroke:#9ca3af,stroke-width:2px,stroke-dasharray: 5 5,color:#6b7280,font-weight:bold
+    ''')
 
             map_dialog.open()
         with ui.row().classes('items-center gap-3'): 

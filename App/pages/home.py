@@ -72,9 +72,39 @@ def create_routes():
             ui.label('\"The cosmos is within us. We are made of star-stuff.\" — Carl Sagan').classes('italic text-3xl text-blue-100 mt-4 font-serif drop-shadow-md text-center ').props(' tabindex=0')
             
 
-            # --- INIZIO NUOVO BLOCCO (sostituisci il vecchio ui.grid e il suo contenuto) ---
-            
-            # Definizione dei pannelli interni per ogni modulo
+           
+            ui.html('''
+                <style>
+                    .modulo-container { 
+                        position: relative; 
+                        display: flex; 
+                        flex-direction: column; 
+                        align-items: center; 
+                        z-index: 10; 
+                    }
+                    .modulo-container:hover { 
+                        z-index: 50; 
+                    }
+                    .menu-tendina {
+                        opacity: 0;
+                        visibility: hidden;
+                        transform: translateY(-15px) scale(0.95);
+                        pointer-events: none;
+                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                        position: absolute;
+                        top: 98%; /* Appare appena sotto il cerchio */
+                        width: 18rem; 
+                    }
+                    .modulo-container:hover .menu-tendina {
+                        opacity: 1;
+                        visibility: visible;
+                        transform: translateY(0) scale(1);
+                        pointer-events: auto;
+                    }
+                </style>
+            ''')
+
+            # 2. Definizione dei sottomenu con relative icone
             module_panels = {
                 1: [
                     ('intro', 'Structures of Universe', '🌌'),
@@ -95,6 +125,7 @@ def create_routes():
                 ]
             }
 
+            # 3. Creazione della griglia principale
             with ui.grid(columns=4).classes('w-full justify-center gap-10 mt-8 mb-8 flex-wrap'):
                 module_titles = [
                     "Introduction to Cosmology","Dark Matter","Universe History & CMB" ,"Redshift & Universe Expansion"
@@ -110,15 +141,14 @@ def create_routes():
                 )
                 
                 for i, title in enumerate(module_titles, 1):
-               
                     is_locked = (i in [3, 4]) and MODULES_LOCKED
                     
                     current_style = star_style
                     if is_locked:
                         current_style = current_style.replace('cursor-pointer', 'cursor-not-allowed') + ' opacity-75 grayscale'
                     
-                    # WRAPPER FONDAMENTALE PER L'EFFETTO HOVER
-                    with ui.element('div').classes('relative group flex flex-col items-center z-10 hover:z-50'):
+                    # Usa la classe CSS nativa "modulo-container"
+                    with ui.element('div').classes('modulo-container'):
 
                         card = ui.card().classes(current_style).props(
                             f'role=button tabindex=0 aria-label="{"Locked" if is_locked else "Go to"} module {i}: {title}"'
@@ -147,23 +177,22 @@ def create_routes():
                             
                             ui.label(title).classes('text-2xl font-semibold text-slate-800 leading-tight')
 
-                        # MENU A TENDINA (Visibile solo in hover)
+                        # Il menu a tendina che appare in hover (usa la classe "menu-tendina")
                         if i in module_panels and not is_locked:
                             with ui.column().classes(
-                                "absolute top-[95%] w-72 hidden group-hover:flex flex-col gap-2 p-4 "
+                                "menu-tendina flex-col gap-2 p-4 "
                                 "bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-blue-400/40 "
-                                "shadow-[0_20px_50px_rgba(0,0,0,0.8)] transition-all duration-300 "
-                                "opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100"
+                                "shadow-[0_20px_50px_rgba(0,0,0,0.8)]"
                             ):
-                                # Freccetta stile "fumetto"
+                                # Triangolino decorativo verso l'alto
                                 ui.element('div').classes("absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-slate-900 rotate-45 border-t border-l border-blue-400/40")
                                 
                                 ui.label('Quick Access').classes('text-blue-300 text-xs font-bold uppercase tracking-widest text-center w-full mb-1 border-b border-blue-500/30 pb-2')
                                 
-                                # Setup variabile memoria a seconda del modulo
                                 tab_storage_key = 'module1_selected' if i == 1 else 'module2_selected'
                                 
                                 for tab_val, tab_label, icon in module_panels[i]:
+                                    # Funzione di navigazione ai singoli pannelli
                                     def create_nav_handler(mod_idx, tk, tv):
                                         def handler():
                                             app.storage.user[tk] = tv
