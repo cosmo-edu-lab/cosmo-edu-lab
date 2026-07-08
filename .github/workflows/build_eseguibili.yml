@@ -5,7 +5,6 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
-
 permissions:
   contents: write
 
@@ -35,11 +34,15 @@ jobs:
     - name: 4. Lancia lo script di PyInstaller
       run: python build_script.py
 
-    - name: 5. Salva i file eseguibili creati
+    - name: 5. Crea l'archivio ZIP multipiattaforma
+    
+      run: python -c "import shutil; shutil.make_archive('CosmoEduLab-${{ matrix.os }}', 'zip', 'dist')"
+
+    - name: 6. Salva l'archivio ZIP creato
       uses: actions/upload-artifact@v4
       with:
-        name: CosmoEduLab-${{ matrix.os }}
-        path: dist/*
+        name: artifact-${{ matrix.os }}
+        path: CosmoEduLab-${{ matrix.os }}.zip
 
   
   release:
@@ -47,18 +50,23 @@ jobs:
     needs: build 
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Raccogli tutti gli eseguibili generati
+      - name: 1. Scarica il codice (necessario per aggiornare il tag git)
+        uses: actions/checkout@v4
+
+      - name: 2. Raccogli tutti gli ZIP generati
         uses: actions/download-artifact@v4
         with:
-          path: dist/
+          path: release_zips/
           merge-multiple: true 
 
-      - name: 2. Aggiorna la Release in automatico
+      - name: 3. Aggiorna la Release in automatico
         uses: ncipollo/release-action@v1
         with:
-          tag: "latest"
-          name: "Cosmo-Edu Lab (Ultima Versione)"
-          body: "Questi eseguibili vengono rigenerati automaticamente a ogni aggiornamento del codice."
+          tag: "v1.0"                        
+          name: "Cosmo-Edu Lab v1.0"
+          body: "Aggiornamento automatico degli eseguibili."
           allowUpdates: true
           replacesArtifacts: true
-          artifacts: "dist/*"
+          makeLatest: true
+          commit: ${{ github.sha }}
+          artifacts: "release_zips/*.zip"
