@@ -32,7 +32,7 @@ jobs:
         pip install -r requirements.txt
 
     - name: 4. Lancia lo script di PyInstaller
-      run: python App/build_script.py
+      run: python build_script.py
 
     - name: 5. Crea l'archivio ZIP multipiattaforma 
       shell: bash
