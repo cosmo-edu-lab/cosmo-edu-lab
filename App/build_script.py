@@ -5,8 +5,8 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import sys
 
 
-APP_DIR = "App"
-sys.path.append(os.path.abspath(APP_DIR))
+#APP_DIR = "App"
+#sys.path.append(os.path.abspath(APP_DIR))
 
 from astropy.utils import iers
 
@@ -44,23 +44,23 @@ latex_datas = collect_data_files('latex2mathml')
 imageio_datas = collect_data_files('imageio')
 
 my_datas = [
-    (os.path.join(APP_DIR, 'static'), 'static'),           
-    (os.path.join(APP_DIR, 'images'), 'images'),           
-    (os.path.join(APP_DIR, 'data'), 'data'),               
-    (os.path.join(APP_DIR, 'dataset'), 'dataset'), 
-    (os.path.join(APP_DIR, 'galaxy_data'), 'galaxy_data'), 
-    (os.path.join(APP_DIR, 'cluster_data'), 'cluster_data'),
-    (os.path.join(APP_DIR, 'cluster_tables'), 'cluster_tables'),
-    (os.path.join(APP_DIR, 'iso_fe0.01'), 'iso_fe0.01'),
-    (os.path.join(APP_DIR, 'pages'), 'pages'),
-    (os.path.join(APP_DIR, 'galaxy_spectra'), 'galaxy_spectra'),
-    (os.path.join(APP_DIR, 'planet_image'), 'planet_image'),
-    (os.path.join(APP_DIR, 'galaxy_img'), 'galaxy_img'),
-    (os.path.join(APP_DIR, 'cluster_img'), 'cluster_img'),
-    (os.path.join(APP_DIR, 'galaxy_tables'), 'galaxy_tables'),
-    (os.path.join(APP_DIR, 'slides'), 'slides'),
-    (os.path.join(APP_DIR, 'discovery_images'), 'discovery_images'),
-    (os.path.join(APP_DIR, 'cosmic_epochs'), 'cosmic_epochs'),
+    ('static', 'static'),           
+    ('images', 'images'),           
+    ('data', 'data'),               
+    ('dataset', 'dataset'), 
+    ('galaxy_data', 'galaxy_data'), 
+    ('cluster_data', 'cluster_data'),
+    ('cluster_tables', 'cluster_tables'),
+    ('iso_fe0.01', 'iso_fe0.01'),
+    ('pages', 'pages'),
+    ('galaxy_spectra', 'galaxy_spectra'),
+    ('planet_image', 'planet_image'),
+    ('galaxy_img', 'galaxy_img'),
+    ('cluster_img', 'cluster_img'),
+    ('galaxy_tables', 'galaxy_tables'),
+    ('slides', 'slides'),
+    ('discovery_images', 'discovery_images'),
+    ('cosmic_epochs', 'cosmic_epochs'),
 ]
 
 all_datas = my_datas + astroquery_datas + astropy_datas + plotly_datas + toolkit_datas + latex_datas + imageio_datas
@@ -101,7 +101,7 @@ for source, dest in all_datas:
 hidden_import_args = [f'--hidden-import={mod}' for mod in hidden_imports]
 
 args = [
-    os.path.join(APP_DIR, 'main.py'),                  
+    'main.py',                  
     f'--name={FINAL_OUTPUT_NAME}',       
     '--onefile',                
     '--clean',                  
