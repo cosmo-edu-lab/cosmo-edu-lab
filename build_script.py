@@ -4,7 +4,7 @@ import platform
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import sys
 
-# La cartella in cui si trovano main.py e tutte le sottocartelle
+
 APP_DIR = "App"
 sys.path.append(os.path.abspath(APP_DIR))
 
@@ -15,7 +15,7 @@ os.environ['ASTROPY_ALLOW_INTERNET'] = 'False'
 iers.conf.auto_download = False
 APP_NAME = "Cosmo-Edu_Lab"
 
-# Riconoscimento del Sistema Operativo
+
 current_os = platform.system()
 if current_os == 'Windows':
     ext = '.exe'
@@ -32,7 +32,7 @@ else:
 
 FINAL_OUTPUT_NAME = f"{APP_NAME}{os_suffix}"
 
-# Rimosse le emoji per evitare UnicodeEncodeError
+
 print(f"Analisi dipendenze complesse per {current_os}...")
 
 # Astroquery e Astropy
@@ -104,7 +104,6 @@ args = [
     os.path.join(APP_DIR, 'main.py'),                  
     f'--name={FINAL_OUTPUT_NAME}',       
     '--onefile',                
-    '--windowed',      
     '--clean',                  
     '--optimize=1',
     '--collect-all=nicegui',          
@@ -114,6 +113,10 @@ args = [
     '--collect-all=astroquery',
     '--collect-all=pyvo',
 ] + add_data_args + hidden_import_args
+
+
+if current_os == 'Windows':
+    args.append('--windowed')
 
 print(f"\nAvvio build completo con supporto per {len(hidden_imports)} librerie su {current_os}...")
 

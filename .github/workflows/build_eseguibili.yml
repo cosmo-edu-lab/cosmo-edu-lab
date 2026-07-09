@@ -34,9 +34,17 @@ jobs:
     - name: 4. Lancia lo script di PyInstaller
       run: python build_script.py
 
-    - name: 5. Crea l'archivio ZIP multipiattaforma
-    
-      run: python -c "import shutil; shutil.make_archive('CosmoEduLab-${{ matrix.os }}', 'zip', 'dist')"
+    - name: 5. Crea l'archivio ZIP multipiattaforma 
+      shell: bash
+      run: |
+        cd dist
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          
+          python -c "import shutil; shutil.make_archive('../CosmoEduLab-${{ matrix.os }}', 'zip', '.')"
+        else
+         
+          zip -ry ../CosmoEduLab-${{ matrix.os }}.zip .
+        fi
 
     - name: 6. Salva l'archivio ZIP creato
       uses: actions/upload-artifact@v4
