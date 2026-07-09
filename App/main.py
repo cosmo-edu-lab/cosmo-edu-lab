@@ -54,6 +54,16 @@ from pages import auth, home, module1, module2, module3, module4
 
 core.load_data()
 core.download_submissions_from_cloud()
+
+if getattr(sys, 'frozen', False):
+   
+    base_path = sys._MEIPASS
+else:
+   
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
+
+BASE_DIR = base_path
 MODULES_LOCKED = os.getenv("MODULES_LOCKED", "True") == "True"
 #app.add_static_files('/cluster_gif', os.path.join(BASE_DIR, 'cluster_gif'))
 app.add_static_files('/images', os.path.join(BASE_DIR, 'images'))
