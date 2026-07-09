@@ -101,7 +101,7 @@ for source, dest in all_datas:
 hidden_import_args = [f'--hidden-import={mod}' for mod in hidden_imports]
 
 args = [
-    'main.py',                  
+   os.path.join(os.path.dirname(os.path.abspath(__file__)), 'main.py'),                
     f'--name={FINAL_OUTPUT_NAME}',       
     '--onefile',                
     '--clean',                  
