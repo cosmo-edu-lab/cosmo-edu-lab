@@ -55,7 +55,7 @@ def fig_to_base64(fig):
     return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('utf-8')
 
 
-HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 
 
@@ -108,7 +108,7 @@ else:
 def load_data():
     global app_data
   
-    if HF_API_TOKEN:
+    if HF_TOKEN:
         try:
             print("☁️ Attempting to download data from Cloud...", end=" ")
           
@@ -116,7 +116,7 @@ def load_data():
                 repo_id=DATASET_REPO_ID,
                 filename=DATASET_FILENAME,
                 repo_type="dataset",
-                token=HF_API_TOKEN,
+                token=HF_TOKEN,
                 local_dir=BASE_DIR,
                
             )
@@ -154,10 +154,10 @@ def save_data():
         print(f"❌ Error saving local data: {e}")
 
     # 2. CLOUD SYNC
-    if HF_API_TOKEN:
+    if HF_TOKEN:
         def _upload_task():
             try:
-                api = HfApi(token=HF_API_TOKEN)
+                api = HfApi(token=HF_TOKEN)
                 path_to_upload = os.path.join(BASE_DIR, LOCAL_DATA_FILE)
                 api.upload_file(
                     path_or_fileobj=path_to_upload,
@@ -174,9 +174,9 @@ def save_data():
 
 def download_submissions_from_cloud():
     
-    if HF_API_TOKEN:
+    if HF_TOKEN:
         try:
-            api = HfApi(token=HF_API_TOKEN)
+            api = HfApi(token=HF_TOKEN)
           
             all_files = api.list_repo_files(repo_id=DATASET_REPO_ID, repo_type="dataset")
             
@@ -189,7 +189,7 @@ def download_submissions_from_cloud():
                     filename=remote_file,
                     local_dir=SUBMISSIONS_PATH,
                     repo_type="dataset",
-                    token=HF_API_TOKEN
+                    token=HF_TOKEN
                 )
             print("✅ Exercises synchronized from Cloud.")
         except Exception as e:

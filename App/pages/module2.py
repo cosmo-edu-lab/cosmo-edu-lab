@@ -79,9 +79,9 @@ def create_page():
             f.write(e.content.read())
         
        
-        if core.HF_API_TOKEN:
+        if core.HF_TOKEN:
             try:
-                api = HfApi(token=core.HF_API_TOKEN)
+                api = HfApi(token=core.HF_TOKEN)
             
                 api.upload_file(
                     path_or_fileobj=file_path,
@@ -1062,9 +1062,9 @@ def create_page():
                                         f.write(response.content)
                                         
                                   
-                                    if core.HF_API_TOKEN:
+                                    if core.HF_TOKEN:
                                         try:
-                                            api = HfApi(token=core.HF_API_TOKEN)
+                                            api = HfApi(token=core.HF_TOKEN)
                                             api.upload_file(
                                                 path_or_fileobj=file_path,
                                                 path_in_repo=f"Exercises/{file_name}",
@@ -1117,9 +1117,9 @@ def create_page():
                                         f.write(e.content.read())
                                     
                                
-                                    if core.HF_API_TOKEN:
+                                    if core.HF_TOKEN:
                                         try:
-                                            api = HfApi(token=core.HF_API_TOKEN)
+                                            api = HfApi(token=core.HF_TOKEN)
                                             api.upload_file(
                                                 path_or_fileobj=file_path,
                                                 path_in_repo=f"Exercises/{e.name}",
