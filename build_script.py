@@ -4,13 +4,13 @@ import platform
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import sys
 
-# 1. Impostiamo i percorsi assoluti per controllare dove finiscono i file
+# 1. Definiamo i percorsi assoluti in modo inequivocabile
 ROOT_DIR = os.path.abspath(os.getcwd())
 APP_DIR = os.path.join(ROOT_DIR, "App")
 DIST_DIR = os.path.join(ROOT_DIR, "dist")
 BUILD_DIR = os.path.join(ROOT_DIR, "build")
 
-# Aggiungiamo App al sys.path per permettere l'import di astropy pre-build
+# Aggiungiamo App al path
 sys.path.append(APP_DIR)
 
 try:
@@ -41,14 +41,10 @@ FINAL_OUTPUT_NAME = f"{APP_NAME}{os_suffix}"
 
 print(f"Analisi dipendenze complesse per {current_os}...")
 
-# -------------------------------------------------------------------
-# IL TRUCCO È QUI: Ci spostiamo dentro 'App/' per replicare 
-# l'esatto comportamento di PyInstaller in locale.
-# -------------------------------------------------------------------
-print(f"Spostamento nella directory {APP_DIR} per replicare l'ambiente locale...")
+# Spostamento virtuale in App
 os.chdir(APP_DIR)
 
-# Astroquery e Astropy
+# Raccolta dati librerie
 astroquery_datas = collect_data_files('astroquery')
 astropy_datas = collect_data_files('astropy')
 plotly_datas = collect_data_files('plotly')
@@ -56,28 +52,29 @@ toolkit_datas = collect_data_files('nicegui_toolkit')
 latex_datas = collect_data_files('latex2mathml')
 imageio_datas = collect_data_files('imageio')
 
-# Usiamo i percorsi relativi esattamente come in build.py (visto che ora siamo dentro App)
-my_datas = [
-    ('static', 'static'),           
-    ('images', 'images'),           
-    ('data', 'data'),               
-    ('dataset', 'dataset'), 
-    ('galaxy_data', 'galaxy_data'), 
-    ('cluster_data', 'cluster_data'),
-    ('cluster_tables', 'cluster_tables'),
-    ('iso_fe0.01', 'iso_fe0.01'),
-    ('pages', 'pages'),
-    ('galaxy_spectra', 'galaxy_spectra'),
-    ('planet_image', 'planet_image'),
-    ('galaxy_img', 'galaxy_img'),
-    ('cluster_img', 'cluster_img'),
-    ('galaxy_tables', 'galaxy_tables'),
-    ('slides', 'slides'),
-    ('discovery_images', 'discovery_images'),
-    ('cosmic_epochs', 'cosmic_epochs'),
+# 2. Definiamo solo i nomi delle TUE cartelle
+my_folders = [
+    'static', 'images', 'data', 'dataset', 'galaxy_data', 'cluster_data',
+    'cluster_tables', 'iso_fe0.01', 'pages', 'galaxy_spectra', 'planet_image',
+    'galaxy_img', 'cluster_img', 'galaxy_tables', 'slides', 'discovery_images',
+    'cosmic_epochs'
 ]
 
-all_datas = my_datas + astroquery_datas + astropy_datas + plotly_datas + toolkit_datas + latex_datas + imageio_datas
+add_data_args = []
+separator = ';' if current_os == 'Windows' else ':' 
+
+# 3. Costruiamo i percorsi ASSOLUTI per la sorgente e manteniamo il nome cartella per la destinazione
+for folder in my_folders:
+    source_path = os.path.join(APP_DIR, folder) # Es: /percorso/assoluto/.../App/images
+    if os.path.exists(source_path):
+        add_data_args.append(f'--add-data={source_path}{separator}{folder}')
+    else:
+        print(f"WARNING: Cartella non trovata: {source_path}")
+
+# Aggiungiamo i dati delle librerie esterne
+for source, dest in astroquery_datas + astropy_datas + plotly_datas + toolkit_datas + latex_datas + imageio_datas:
+    if os.path.exists(source) or os.path.isabs(source):
+        add_data_args.append(f'--add-data={source}{separator}{dest}')
 
 hidden_imports = [
     'scipy.special.cython_special',
@@ -103,27 +100,17 @@ hidden_imports = [
 hidden_imports += collect_submodules('astroquery')
 hidden_imports += collect_submodules('nicegui_toolkit')
 
-add_data_args = []
-separator = ';' if current_os == 'Windows' else ':' 
-
-for source, dest in all_datas:
-    # Aggiungiamo un controllo che supporta sia i percorsi relativi che quelli assoluti
-    if os.path.exists(source) or os.path.isabs(source):
-        add_data_args.append(f'--add-data={source}{separator}{dest}')
-    else:
-        print(f"WARNING: Data source not found: {source}")
-
 hidden_import_args = [f'--hidden-import={mod}' for mod in hidden_imports]
 
-# Costruiamo gli argomenti finali
 args = [
-    'main.py',                  # Nota: ora puntiamo solo a 'main.py' e non ad 'App/main.py'
+    'main.py',                  
     f'--name={FINAL_OUTPUT_NAME}',       
     '--onefile',                
     '--clean',                  
     '--optimize=1',
-    f'--distpath={DIST_DIR}',   # Indirizziamo l'output verso la root (per GitHub Actions)
-    f'--workpath={BUILD_DIR}',  # Idem per le cartelle di cache temporanee
+    f'--distpath={DIST_DIR}',   
+    f'--workpath={BUILD_DIR}',  
+    f'--specpath={APP_DIR}',     # 4. FORZIAMO la creazione del file .spec dentro la cartella App!
     '--collect-all=nicegui',          
     '--collect-all=nicegui_toolkit', 
     '--collect-all=xyz_services',
