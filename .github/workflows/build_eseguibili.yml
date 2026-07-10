@@ -1,80 +1,73 @@
-name: Compila Cosmo-Edu-Lab (Win, Mac, Linux)
+name: Build Eseguibili Multi-Piattaforma
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
-permissions:
-  contents: write
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
-    name: Build su ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - name: 1. Scarica il codice dal repository
+    - name: Controlla il Repository (Abilitando Git LFS)
       uses: actions/checkout@v4
+      with:
+        lfs: true 
 
-    - name: 2. Installa Python
+    - name: Forza il checkout degli oggetti LFS
+      run: git lfs checkout
+
+    - name: Configura Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' 
+        python-version: '3.10'
 
-    - name: 3. Installa PyInstaller e le dipendenze
+    - name: Installa Dipendenze
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
-        pip install -r requirements.txt
+        pip install pyinstaller nicegui nicegui_toolkit plotly astropy astroquery scipy networkx pillow huggingface_hub pyvo
 
-    - name: 4. Lancia lo script di PyInstaller
+    - name: Esegui build_script.py
       run: python build_script.py
 
-    - name: 5. Crea l'archivio ZIP multipiattaforma 
-      shell: bash
+ 
+    - name: Prepara lo ZIP (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
-        cd dist
-        if [ "${{ runner.os }}" == "Windows" ]; then
-          
-          python -c "import shutil; shutil.make_archive('../CosmoEduLab-${{ matrix.os }}', 'zip', '.')"
+        Compress-Archive -Path dist/Cosmo-Edu_Lab_Windows.exe -DestinationPath CosmoEduLab-windows-latest.zip
+
+    - name: Prepara lo ZIP (Mac)
+      if: matrix.os == 'macos-latest'
+      run: |
+        if [ -d "dist/Cosmo-Edu_Lab_Mac.app" ]; then
+          zip -r CosmoEduLab-macos-latest.zip dist/Cosmo-Edu_Lab_Mac.app
         else
-         
-          zip -ry ../CosmoEduLab-${{ matrix.os }}.zip .
+          zip -j CosmoEduLab-macos-latest.zip dist/Cosmo-Edu_Lab_Mac
         fi
 
-    - name: 6. Salva l'archivio ZIP creato
+    - name: Prepara lo ZIP (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        zip -j CosmoEduLab-ubuntu-latest.zip dist/Cosmo-Edu_Lab_Linux
+
+   
+    - name: Carica l'archivio ZIP come Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: artifact-${{ matrix.os }}
-        path: CosmoEduLab-${{ matrix.os }}.zip
+        name: CosmoEduLab-${{ matrix.os == 'windows-latest' && 'windows-latest' || matrix.os == 'macos-latest' && 'macos-latest' || 'ubuntu-latest' }}
+        path: CosmoEduLab-*.zip
 
-  
-  release:
-    name: Pubblica la Release
-    needs: build 
-    runs-on: ubuntu-latest
-    steps:
-      - name: 1. Scarica il codice (necessario per aggiornare il tag git)
-        uses: actions/checkout@v4
 
-      - name: 2. Raccogli tutti gli ZIP generati
-        uses: actions/download-artifact@v4
-        with:
-          path: release_zips/
-          merge-multiple: true 
-
-      - name: 3. Aggiorna la Release in automatico
-        uses: ncipollo/release-action@v1
-        with:
-          tag: "v1.0"                        
-          name: "Cosmo-Edu Lab v1.0"
-          body: "Aggiornamento automatico degli eseguibili."
-          allowUpdates: true
-          replacesArtifacts: true
-          makeLatest: true
-          commit: ${{ github.sha }}
-          artifacts: "release_zips/*.zip"
+    - name: Carica nella Release di GitHub (Opzionale - se attivo)
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: CosmoEduLab-*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

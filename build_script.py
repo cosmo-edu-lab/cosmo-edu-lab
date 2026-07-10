@@ -4,13 +4,11 @@ import platform
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import sys
 
-# 1. Definiamo i percorsi assoluti in modo inequivocabile
 ROOT_DIR = os.path.abspath(os.getcwd())
-APP_DIR = os.path.join(ROOT_DIR, "App")
-DIST_DIR = os.path.join(ROOT_DIR, "dist")
-BUILD_DIR = os.path.join(ROOT_DIR, "build")
+APP_DIR = os.path.abspath(os.path.join(ROOT_DIR, "App"))
+DIST_DIR = os.path.abspath(os.path.join(ROOT_DIR, "dist"))
+BUILD_DIR = os.path.abspath(os.path.join(ROOT_DIR, "build"))
 
-# Aggiungiamo App al path
 sys.path.append(APP_DIR)
 
 try:
@@ -41,10 +39,8 @@ FINAL_OUTPUT_NAME = f"{APP_NAME}{os_suffix}"
 
 print(f"Analisi dipendenze complesse per {current_os}...")
 
-# Spostamento virtuale in App
 os.chdir(APP_DIR)
 
-# Raccolta dati librerie
 astroquery_datas = collect_data_files('astroquery')
 astropy_datas = collect_data_files('astropy')
 plotly_datas = collect_data_files('plotly')
@@ -52,7 +48,6 @@ toolkit_datas = collect_data_files('nicegui_toolkit')
 latex_datas = collect_data_files('latex2mathml')
 imageio_datas = collect_data_files('imageio')
 
-# 2. Definiamo solo i nomi delle TUE cartelle
 my_folders = [
     'static', 'images', 'data', 'dataset', 'galaxy_data', 'cluster_data',
     'cluster_tables', 'iso_fe0.01', 'pages', 'galaxy_spectra', 'planet_image',
@@ -63,15 +58,14 @@ my_folders = [
 add_data_args = []
 separator = ';' if current_os == 'Windows' else ':' 
 
-# 3. Costruiamo i percorsi ASSOLUTI per la sorgente e manteniamo il nome cartella per la destinazione
 for folder in my_folders:
-    source_path = os.path.join(APP_DIR, folder) # Es: /percorso/assoluto/.../App/images
+    source_path = os.path.abspath(os.path.join(APP_DIR, folder))
     if os.path.exists(source_path):
+       
         add_data_args.append(f'--add-data={source_path}{separator}{folder}')
     else:
         print(f"WARNING: Cartella non trovata: {source_path}")
 
-# Aggiungiamo i dati delle librerie esterne
 for source, dest in astroquery_datas + astropy_datas + plotly_datas + toolkit_datas + latex_datas + imageio_datas:
     if os.path.exists(source) or os.path.isabs(source):
         add_data_args.append(f'--add-data={source}{separator}{dest}')
@@ -110,7 +104,7 @@ args = [
     '--optimize=1',
     f'--distpath={DIST_DIR}',   
     f'--workpath={BUILD_DIR}',  
-    f'--specpath={APP_DIR}',     # 4. FORZIAMO la creazione del file .spec dentro la cartella App!
+    f'--specpath={APP_DIR}',     
     '--collect-all=nicegui',          
     '--collect-all=nicegui_toolkit', 
     '--collect-all=xyz_services',
