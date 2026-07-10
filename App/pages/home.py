@@ -104,15 +104,16 @@ def create_routes():
                 </style>
             ''')
 
-            # 2. Definizione dei sottomenu con relative icone
+          
             module_panels = {
                 1: [
                     ('intro', 'Structures of Universe', '🌌'),
                     ('discovery', 'Discoveries Timeline', '🔭'),
                     ('universe', 'Universe Evolution', '⏳'),
                     ('instrument', 'Observational Methods', '📡'),
-                    ('planets', 'Planets', '🪐'),
+                 
                     ('galaxy', 'Galaxies', '🌀'),
+                       ('milkyway', 'Milky Way', '🌌'),
                     ('stars', 'Stars', '✨'),
                     ('particles', 'Fundamental Particles', '⚛️')
                 ],
@@ -125,7 +126,7 @@ def create_routes():
                 ]
             }
 
-            # 3. Creazione della griglia principale
+           
             with ui.grid(columns=4).classes('w-full justify-center gap-10 mt-8 mb-8 flex-wrap'):
                 module_titles = [
                     "Introduction to Cosmology","Dark Matter","Universe History & CMB" ,"Redshift & Universe Expansion"

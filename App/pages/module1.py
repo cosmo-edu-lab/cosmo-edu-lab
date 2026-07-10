@@ -319,8 +319,9 @@ def create_page():
             ui.tab('discovery', label='Discoveries Timeline').props('aria-label="Discoveries Timeline"')
             ui.tab('universe', label='Universe Evolution').props('aria-label="Universe Evolution"')
             ui.tab('instrument', label='Observational Methods').props('aria-label="Observational Instruments and Methods"')
-            ui.tab('planets', label='Planets ').props('aria-label="Planets and Milky Way"')
+            
             ui.tab('galaxy', label='Galaxies ').props('aria-label="Galaxy Map"')
+            ui.tab('milky_way', label='Milky Way').props('aria-label="Milky Way"')
             ui.tab('stars', label='Stars ').props('aria-label="Stars Map"')
             ui.tab('particles', label='Fundamental Particles').props('aria-label="Fundamental Particles"')
 #functions for observational methods and instruments dialog        
@@ -1294,7 +1295,10 @@ def create_page():
                 with ui.column().classes('w-full p-8 bg-slate-900 rounded-xl shadow-2xl border border-slate-600 flex flex-col items-center mt-8 mb-12'):
                     ui.label("🎮 AstroScales: Cosmic Structures").classes("text-3xl md:text-4xl font-bold text-yellow-400 mb-4 text-center drop-shadow-md uppercase tracking-wider").props('role=heading aria-level=2 tabindex=0')
                     
+                    
                     with ui.row().classes('w-full max-w-[800px] justify-between bg-slate-800 p-4 rounded-lg border border-slate-500 mb-6 shadow-inner items-center'):
+                        global global_notification_area
+                        global_notification_area = ui.column().classes('w-full min-h-[60px] items-center justify-center mb-2')
                         time_label = ui.label('Time: 0s').classes('text-xl text-white font-bold w-24')
                         ui.html('<div id="score_display" class="text-xl font-bold w-32 text-center text-green-400">Score: 0</div>')
 
@@ -2566,8 +2570,10 @@ def create_page():
 
                 with ui.column().classes('w-full p-8 bg-slate-900 rounded-xl shadow-2xl border border-slate-600 flex flex-col items-center mt-8 mb-12'):
                     ui.label("🎮 AstroParticles: Challenge").classes("text-3xl md:text-4xl font-bold text-yellow-400 mb-4 text-center drop-shadow-md uppercase tracking-wider").props('role=heading aria-level=2 tabindex=0')
-
+                    
                     with ui.row().classes('w-full max-w-[800px] justify-between bg-slate-800 p-4 rounded-lg border border-slate-500 mb-6 shadow-inner items-center'):
+                        global global_notification_area
+                        global_notification_area = ui.column().classes('w-full min-h-[60px] items-center justify-center mb-2')
                         time_label = ui.label('Time: 0s').classes('text-xl text-white font-bold w-24')
                         ui.html('<div id="particle_score" class="text-xl font-bold w-32 text-center text-green-400">Score: 0</div>')
 
@@ -2955,6 +2961,8 @@ def create_page():
                 ui.label('History of Astronomy Quiz').classes('text-2xl font-bold text-blue-600 mb-4 text-center').props('role=heading aria-level=2 tabindex=0')
                 
                 with ui.row().classes('w-full justify-between mb-4 bg-gray-200 p-3 rounded-lg border border-gray-300 shadow-inner'):
+                    global global_notification_area
+                    global_notification_area = ui.column().classes('w-full min-h-[50px] items-center justify-center mb-2')
                     time_lbl = ui.label('Time: 0s').classes('text-lg text-black font-bold')
                     score_lbl = ui.label('Score: 0').classes('text-lg text-blue-700 font-bold')
                 
@@ -3260,6 +3268,8 @@ def create_page():
                 ui.label('Cosmological Epochs Quiz').classes('text-2xl font-bold text-green-400 mb-4 text-center drop-shadow-md').props('role=heading aria-level=2 tabindex=0')
                 
                 with ui.row().classes('w-full justify-between mb-4 bg-gray-800 p-3 rounded-lg border border-gray-600 shadow-inner'):
+                    global global_notification_area
+                    global_notification_area = ui.column().classes('w-full min-h-[50px] items-center justify-center mb-2')
                     time_lbl = ui.label('Time: 0s').classes('text-lg text-white font-bold')
                     score_lbl = ui.label('Score: 0').classes('text-lg text-blue-400 font-bold').props('aria-live=polite')
                 
@@ -4205,6 +4215,8 @@ namelength=-1,
                     ui.label("🎮 AstroStars: Roleplay").classes("text-3xl md:text-4xl font-bold text-yellow-400 mb-4 text-center drop-shadow-md uppercase tracking-wider").props('role=heading aria-level=2 tabindex=0')
                     
                     with ui.row().classes('w-full max-w-[800px] justify-between bg-slate-800 p-4 rounded-lg border border-slate-500 mb-6 shadow-inner items-center'):
+                        global global_notification_area
+                        global_notification_area = ui.column().classes('w-full min-h-[60px] items-center justify-center mb-2')
                         lbl_time = ui.label('Time: 0s').classes('text-xl text-white font-bold w-24')
                         lbl_score = ui.label('Score: 0').classes('text-xl text-green-400 font-bold w-32 text-center').props('aria-live=polite')
                         
@@ -4441,7 +4453,8 @@ namelength=-1,
 
                 with ui.column().classes('w-full max-w-[1000px] mx-auto p-8 bg-slate-900 rounded-xl shadow-2xl border border-slate-600 flex flex-col items-center mt-8 mb-6'):
                     ui.label("🎮 AstroEarth: Locate the Solar System").classes("text-3xl md:text-4xl font-bold text-yellow-400 mb-6 text-center drop-shadow-md uppercase tracking-wider").props('role=heading aria-level=2 tabindex=0')
-                    
+                    global global_notification_area
+                    global_notification_area = ui.column().classes('w-full min-h-[60px] items-center justify-center mb-2')
                     img_container = ui.element('div').classes('relative rounded-xl shadow-2xl border-4 border-slate-800 cursor-crosshair shrink bg-black')
                     img_container.style(f'width: {IMG_PIXEL_SIZE}px; max-width: 100%; aspect-ratio: 1/1;')
                     
@@ -4515,7 +4528,14 @@ namelength=-1,
                                     <path d="M {CENTER_PX} {CENTER_PX} L {x1} {y1} A {r_target_px} {r_target_px} 0 0 1 {x2} {y2} Z" fill="#4ade80" fill-opacity="0.2" stroke="none" />
                                     <text x="{CENTER_PX}" y="{CENTER_PX + r_target_px + 30}" text-anchor="middle" fill="#4ade80" font-weight="bold" font-size="18">Correct Zone</text>
                                 '''
+                            svg_content += f'''
+                                <text x="{CENTER_PX}" y="{CENTER_PX + 150}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Orion Arm</text>
+                                <text x="{CENTER_PX}" y="{CENTER_PX + 250}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Perseus Arm</text>
+                                <text x="{CENTER_PX}" y="{CENTER_PX - 120}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Sagittarius Arm</text>
+                                <text x="{CENTER_PX - 150}" y="{CENTER_PX - 50}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Scutum-Centaurus Arm</text>
+                            '''
 
+                            
                             interactive_img.content = svg_content
                             accessible_notify(msg, type='positive' if "✅" in status else 'warning')
 
@@ -5263,8 +5283,10 @@ namelength=-1,
                
                 with ui.column().classes('w-full p-8 bg-slate-900 rounded-xl shadow-2xl border border-slate-600 flex flex-col items-center mt-8 mb-12'):
                     ui.label("🎮 AstroMemory: Galaxy Morphology").classes("text-3xl md:text-4xl font-bold text-yellow-400 mb-4 text-center drop-shadow-md uppercase tracking-wider").props('role=heading aria-level=2 tabindex=0')
-
+                    
                     with ui.row().classes('w-full max-w-[800px] justify-between bg-slate-800 p-4 rounded-lg border border-slate-500 mb-6 shadow-inner items-center'):
+                        global global_notification_area
+                        global_notification_area = ui.column().classes('w-full min-h-[60px] items-center justify-center mb-2')
                         lbl_time = ui.label('Time: 0s').classes('text-xl text-white font-bold w-24')
                         lbl_score = ui.label('Score: 0').classes('text-xl text-green-400 font-bold w-32 text-center').props('aria-live=polite')
                         def game_tick():
@@ -5433,10 +5455,11 @@ namelength=-1,
                 cosmic_timeline(history_panel)
             with ui.tab_panel('instrument') as instrument_panel:
                 instrument_page(instrument_panel)
-            with ui.tab_panel('planets') as planets_panel:
-                planets_page(planets_panel)
+            
             with ui.tab_panel('galaxy') as galaxy_panel:
                 galaxy_map_page(galaxy_panel)
+            with ui.tab_panel('milky_way') as planets_panel:
+                planets_page(planets_panel)
             with ui.tab_panel('stars') as star_panel:
                 hr_diagram_page(star_panel,STAR_GAIA_PATH)
             with ui.tab_panel('particles') as particle_panel:

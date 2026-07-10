@@ -247,32 +247,44 @@ def plot_info_box_compact(info: dict, title: str = None, compact: bool = True):
 
 global_notification_area = None
 
-def accessible_notify(text: str, type_: str = "info"):
+
+def accessible_notify(text: str, type_: str = "info", *args, **kwargs):
     global global_notification_area
     
-
+  
+    t = kwargs.get('type_', kwargs.get('type', type_))
+    color_arg = kwargs.get('color', None)
+    if color_arg:
+        if color_arg in ['positive', 'success']: t = 'success'
+        elif color_arg in ['negative', 'error']: t = 'error'
+        elif color_arg in ['warning']: t = 'warning'
+    
     target_container = global_notification_area if global_notification_area else ui.context.client.layout
     
     if global_notification_area:
         global_notification_area.clear()
-
-    color = {
-        "info": "!bg-blue-50 text-blue-800 border-blue-400",
-        "success": "!bg-green-50 text-green-800 border-green-400",
-        "warning": "!bg-yellow-50 text-yellow-800 border-yellow-400",
-        "error": "!bg-red-50 text-red-800 border-red-400",
-    }[type_]
-
-    with target_container:
-        with ui.card().classes(f"p-3 border rounded-lg shadow-sm w-full max-w-3xl text-center mx-auto mt-2 {color}").props(
-            f'role={"alert" if type_ in ["error","warning"] else "status"} aria-live=polite tabindex=0'
-        ): 
-            ui.label(text).classes('text-base font-semibold')
+      
+        global_notification_area.style('display: flex; width: 100%;')
 
    
+    color_classes = {
+        "info": "bg-blue-100 text-blue-900 border border-blue-400",
+        "success": "bg-green-100 text-green-900 border border-green-600",
+        "warning": "bg-yellow-100 text-yellow-950 border border-yellow-500",
+        "error": "bg-red-100 text-red-950 border border-red-600",
+    }.get(t, "bg-blue-100 text-blue-900 border border-blue-400")
+
+    with target_container:
+        with ui.card().classes(f"p-2 rounded-lg shadow-sm w-full text-center my-1 text-lg font-bold {color_classes}").props(
+            f'role={"alert" if t in ["error","warning"] else "status"} aria-live=polite tabindex=0'
+        ): 
+            ui.label(text)
+
     def close_and_reset():
         if global_notification_area:
             global_notification_area.clear()
+           
+            global_notification_area.style('display: none;')
 
     ui.timer(4.0, close_and_reset, once=True)
 def enlargeable_plot(plot_func, width_percent=100):
@@ -1636,8 +1648,8 @@ def main_layout(title: str):
     IC2("<b>IC.2</b> Astronomical Discoveries"):::panelClass
     IC3("<b>IC.3</b> Universe Timelines"):::panelClass
     IC4("<b>IC.4</b> Observational Instruments"):::panelClass
-    IC5("<b>IC.5</b> Planets"):::panelClass
-    IC6("<b>IC.6</b> Galaxies"):::panelClass
+    IC5("<b>IC.5</b> Galaxies"):::panelClass
+    IC6("<b>IC.6</b> Milky Way"):::panelClass
     IC7("<b>IC.7</b> Stars"):::panelClass
     IC8("<b>IC.8</b> Fundamental Particles"):::panelClass
     
