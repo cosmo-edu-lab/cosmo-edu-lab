@@ -71,6 +71,7 @@ for source, dest in astroquery_datas + astropy_datas + plotly_datas + toolkit_da
         add_data_args.append(f'--add-data={source}{separator}{dest}')
 
 hidden_imports = [
+    'pandas',
     'scipy.special.cython_special',
     'scipy.spatial.transform._rotation_groups',
     'scipy.stats._stats',
