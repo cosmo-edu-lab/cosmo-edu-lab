@@ -78,17 +78,17 @@ DATA_FILE = 'app_data.json'
 app_data = {'users': {}, 'reflection_log': []}
 
 if getattr(sys, 'frozen', False):
-    # Se siamo nell'eseguibile compilato (Win/Mac/Linux)
-    ASSET_DIR = sys._MEIPASS # Cartella temporanea con immagini e static estratti
-    USER_DIR = os.path.dirname(sys.executable) # Cartella dove si trova fisicamente il file .exe
+    
+    ASSET_DIR = sys._MEIPASS 
+    USER_DIR = os.path.dirname(sys.executable) 
 else:
-    # Se siamo in locale o su Codespace
+   
     ASSET_DIR = os.path.dirname(os.path.abspath(__file__))
     USER_DIR = ASSET_DIR
 
-BASE_DIR = ASSET_DIR # Per retrocompatibilità
+BASE_DIR = ASSET_DIR 
 
-# Dati statici (sola lettura - vanno in ASSET_DIR)
+
 DATA_DIR = os.path.join(ASSET_DIR, "data")
 dataset_path = os.path.join(ASSET_DIR, 'dataset')
 GALAXY_DATA_PATH = os.path.join(ASSET_DIR, "galaxy_data")
@@ -105,7 +105,7 @@ STAR_GAIA_PATH = os.path.join(DATA_DIR, "Gaia_20000.csv")
 MIST_PATH = os.path.join(ASSET_DIR, "iso_fe0.01")
 SDSS_MORPHO_PATH = os.path.join(DATA_DIR, "sdss_gal_morfo.txt")
 
-# Dati utente (lettura/scrittura - vanno in USER_DIR per non essere persi)
+
 SUBMISSIONS_PATH = os.path.join(USER_DIR, "student_submissions")
 if not os.path.exists(SUBMISSIONS_PATH):
     os.makedirs(SUBMISSIONS_PATH, exist_ok=True)
@@ -128,7 +128,7 @@ def load_data():
                 filename=DATASET_FILENAME,
                 repo_type="dataset",
                 token=HF_TOKEN,
-                local_dir=USER_DIR, # MODIFICATO: Prima era BASE_DIR
+                local_dir=USER_DIR, 
             )
             with open(file_path, 'r') as f:
                 downloaded_data = json.load(f)
@@ -153,20 +153,20 @@ def load_data():
 
 def save_data():
     global app_data
-    # 1. LOCAL SAVE
+    
     try:
-        # MODIFICATO: Usa direttamente LOCAL_DATA_FILE che ha già il path assoluto corretto
+    
         with open(LOCAL_DATA_FILE, 'w') as f:
             json.dump(app_data, f, indent=4)
     except Exception as e:
         print(f"❌ Error saving local data: {e}")
 
-    # 2. CLOUD SYNC
+   
     if HF_TOKEN:
         def _upload_task():
             try:
                 api = HfApi(token=HF_TOKEN)
-                # MODIFICATO: Usa direttamente LOCAL_DATA_FILE
+               
                 api.upload_file(
                     path_or_fileobj=LOCAL_DATA_FILE,
                     path_in_repo=DATASET_FILENAME,
