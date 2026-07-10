@@ -5,8 +5,14 @@
 from nicegui import ui, app, client
 import os
 import asyncio
-current_dir = os.path.dirname(os.path.abspath(__file__))
+
 import sys
+import asyncio
+if getattr(sys, 'frozen', False):
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 #from nicegui_toolkit import inject_layout_tool
 from huggingface_hub import HfApi
@@ -51,21 +57,13 @@ from layout import *
 from core import *
 import pages
 from pages import auth, home, module1, module2, module3, module4
-
+import sys
+import asyncio
 core.load_data()
 core.download_submissions_from_cloud()
 
-if getattr(sys, 'frozen', False):
-   
-    base_path = sys._MEIPASS
-else:
-   
-    base_path = os.path.dirname(os.path.abspath(__file__))
 
-
-BASE_DIR = base_path
 MODULES_LOCKED = os.getenv("MODULES_LOCKED", "True") == "True"
-#app.add_static_files('/cluster_gif', os.path.join(BASE_DIR, 'cluster_gif'))
 app.add_static_files('/images', os.path.join(BASE_DIR, 'images'))
 app.add_static_files('/dataset', os.path.join(BASE_DIR, 'dataset'))
 app.add_static_files('/galaxy_img', os.path.join(BASE_DIR, 'galaxy_img'))
@@ -73,8 +71,7 @@ app.add_static_files('/cluster_img', os.path.join(BASE_DIR, 'cluster_img'))
 app.add_static_files('/slides', os.path.join(BASE_DIR, 'slides'))
 app.add_static_files('/discovery_images', os.path.join(BASE_DIR, 'discovery_images'))
 app.add_static_files('/cosmic_epochs', os.path.join(BASE_DIR, 'cosmic_epochs'))
-app.add_static_files('/student_files', core.SUBMISSIONS_PATH)
-
+app.add_static_files('/student_files', core.SUBMISSIONS_PATH) # Prende dalla USER_DIR di core.py
 app.add_static_files('/static', os.path.join(BASE_DIR, 'static'))
 
 auth.create_auth_routes()  

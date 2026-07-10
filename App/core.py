@@ -30,6 +30,8 @@ from math import isfinite
 import numpy as np
 import matplotlib.pyplot as plt
 from google import genai
+import sys
+import asyncio
 DATASET_REPO_ID = "CosmoEduLab/Cosmo_login" 
 DATASET_FILENAME = "app_data.json"
 LOCAL_DATA_FILE = "app_data.json"
@@ -75,35 +77,44 @@ DATA_FILE = 'app_data.json'
 
 app_data = {'users': {}, 'reflection_log': []}
 
+if getattr(sys, 'frozen', False):
+    # Se siamo nell'eseguibile compilato (Win/Mac/Linux)
+    ASSET_DIR = sys._MEIPASS # Cartella temporanea con immagini e static estratti
+    USER_DIR = os.path.dirname(sys.executable) # Cartella dove si trova fisicamente il file .exe
+else:
+    # Se siamo in locale o su Codespace
+    ASSET_DIR = os.path.dirname(os.path.abspath(__file__))
+    USER_DIR = ASSET_DIR
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-dataset_path = os.path.join(BASE_DIR, 'dataset')
-GALAXY_DATA_PATH = os.path.join(BASE_DIR, "galaxy_data")
-GALAXY_IMG_PATH = os.path.join(BASE_DIR, "galaxy_img")
-GALAXY_TABLES_PATH = os.path.join(BASE_DIR, "galaxy_tables")
-CLUSTER_DATA_PATH = os.path.join(BASE_DIR, "cluster_data")
-CLUSTER_IMG_PATH = os.path.join(BASE_DIR, "cluster_img")
-CLUSTER_TABLES_PATH = os.path.join(BASE_DIR, "cluster_tables")
-GALAXY_SPECTRA_PATH = os.path.join(BASE_DIR, "galaxy_spectra/csv_converted")
-GALAXY_LINE_PATH = os.path.join(BASE_DIR, "galaxy_spectra/lambda_obs")
-#GALAXY_FITS_PATH = os.path.join(BASE_DIR, "galaxy_fits")
-PLANETS_IMG_PATH = os.path.join(BASE_DIR, "planet_image")
+BASE_DIR = ASSET_DIR # Per retrocompatibilità
+
+# Dati statici (sola lettura - vanno in ASSET_DIR)
+DATA_DIR = os.path.join(ASSET_DIR, "data")
+dataset_path = os.path.join(ASSET_DIR, 'dataset')
+GALAXY_DATA_PATH = os.path.join(ASSET_DIR, "galaxy_data")
+GALAXY_IMG_PATH = os.path.join(ASSET_DIR, "galaxy_img")
+GALAXY_TABLES_PATH = os.path.join(ASSET_DIR, "galaxy_tables")
+CLUSTER_DATA_PATH = os.path.join(ASSET_DIR, "cluster_data")
+CLUSTER_IMG_PATH = os.path.join(ASSET_DIR, "cluster_img")
+CLUSTER_TABLES_PATH = os.path.join(ASSET_DIR, "cluster_tables")
+GALAXY_SPECTRA_PATH = os.path.join(ASSET_DIR, "galaxy_spectra/csv_converted")
+GALAXY_LINE_PATH = os.path.join(ASSET_DIR, "galaxy_spectra/lambda_obs")
+PLANETS_IMG_PATH = os.path.join(ASSET_DIR, "planet_image")
 GAL_SDSS_PATH = os.path.join(DATA_DIR, "SDSS_30.csv")
 STAR_GAIA_PATH = os.path.join(DATA_DIR, "Gaia_20000.csv")
-#GALAXY_ZOO_PATH = os.path.join(DATA_DIR, "galaxy_zoo_classifications.csv")
-MIST_PATH = os.path.join(BASE_DIR, "iso_fe0.01")
+MIST_PATH = os.path.join(ASSET_DIR, "iso_fe0.01")
 SDSS_MORPHO_PATH = os.path.join(DATA_DIR, "sdss_gal_morfo.txt")
-#cluster_gif_path = os.path.join(BASE_DIR, 'cluster_gif')
 
-SUBMISSIONS_PATH = os.path.join(BASE_DIR, "student_submissions")
-
+# Dati utente (lettura/scrittura - vanno in USER_DIR per non essere persi)
+SUBMISSIONS_PATH = os.path.join(USER_DIR, "student_submissions")
 if not os.path.exists(SUBMISSIONS_PATH):
     os.makedirs(SUBMISSIONS_PATH, exist_ok=True)
-if os.path.exists('/data'):
-    DATA_FILE = '/data/app_data.json'
-else:
-    DATA_FILE = 'app_data.json'
+
+LOCAL_DATA_FILE = os.path.join(USER_DIR, 'app_data.json')
+DATA_FILE = LOCAL_DATA_FILE
+
+
+
 
 def load_data():
     global app_data
@@ -117,11 +128,9 @@ def load_data():
                 filename=DATASET_FILENAME,
                 repo_type="dataset",
                 token=HF_TOKEN,
-                local_dir=BASE_DIR,
-               
+                local_dir=USER_DIR, # MODIFICATO: Prima era BASE_DIR
             )
             with open(file_path, 'r') as f:
-                
                 downloaded_data = json.load(f)
                 app_data.clear() 
                 app_data.update(downloaded_data) 
@@ -134,7 +143,6 @@ def load_data():
     if os.path.exists(LOCAL_DATA_FILE):
         try:
             with open(LOCAL_DATA_FILE, 'r') as f:
-                
                 local_data = json.load(f)
                 app_data.clear()
                 app_data.update(local_data)
@@ -147,8 +155,8 @@ def save_data():
     global app_data
     # 1. LOCAL SAVE
     try:
-        path_to_save = os.path.join(BASE_DIR, LOCAL_DATA_FILE)
-        with open(path_to_save, 'w') as f:
+        # MODIFICATO: Usa direttamente LOCAL_DATA_FILE che ha già il path assoluto corretto
+        with open(LOCAL_DATA_FILE, 'w') as f:
             json.dump(app_data, f, indent=4)
     except Exception as e:
         print(f"❌ Error saving local data: {e}")
@@ -158,9 +166,9 @@ def save_data():
         def _upload_task():
             try:
                 api = HfApi(token=HF_TOKEN)
-                path_to_upload = os.path.join(BASE_DIR, LOCAL_DATA_FILE)
+                # MODIFICATO: Usa direttamente LOCAL_DATA_FILE
                 api.upload_file(
-                    path_or_fileobj=path_to_upload,
+                    path_or_fileobj=LOCAL_DATA_FILE,
                     path_in_repo=DATASET_FILENAME,
                     repo_id=DATASET_REPO_ID,
                     repo_type="dataset",
