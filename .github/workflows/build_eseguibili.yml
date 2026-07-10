@@ -1,4 +1,4 @@
-name: Build Eseguibili 
+name: Build Eseguibili
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     - name: Controlla il Repository (Abilitando Git LFS)
       uses: actions/checkout@v4
       with:
-        lfs: true 
+        lfs: true
 
     - name: Forza il checkout degli oggetti LFS
       run: git lfs checkout
@@ -27,7 +27,7 @@ jobs:
       with:
         python-version: '3.10'
 
-   - name: Installa Dipendenze
+    - name: Installa Dipendenze
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
@@ -36,7 +36,6 @@ jobs:
     - name: Esegui build_script.py
       run: python build_script.py
 
- 
     - name: Prepara lo ZIP (Windows)
       if: matrix.os == 'windows-latest'
       shell: pwsh
@@ -57,20 +56,17 @@ jobs:
       run: |
         zip -j CosmoEduLab-ubuntu-latest.zip dist/Cosmo-Edu_Lab_Linux
 
-   
-  
     - name: Carica l'archivio ZIP come Artifact
       uses: actions/upload-artifact@v4
       with:
         name: CosmoEduLab-${{ matrix.os == 'windows-latest' && 'windows-latest' || matrix.os == 'macos-latest' && 'macos-latest' || 'ubuntu-latest' }}
         path: CosmoEduLab-*.zip
 
-    
     - name: Aggiorna la Release v1.0
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: "v1.0"     
+        tag_name: "v1.0"
         files: CosmoEduLab-*.zip
-        make_latest: true     
+        make_latest: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
