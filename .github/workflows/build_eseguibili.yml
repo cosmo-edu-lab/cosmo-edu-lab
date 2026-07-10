@@ -30,7 +30,7 @@ jobs:
     - name: Installa Dipendenze
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller nicegui nicegui_toolkit plotly astropy astroquery scipy networkx pillow huggingface_hub pyvo
+        pip install pyinstaller nicegui plotly astropy astroquery scipy networkx pillow huggingface_hub pyvo
 
     - name: Esegui build_script.py
       run: python build_script.py
