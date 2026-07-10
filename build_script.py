@@ -4,17 +4,24 @@ import platform
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import sys
 
+# 1. Impostiamo i percorsi assoluti per controllare dove finiscono i file
+ROOT_DIR = os.path.abspath(os.getcwd())
+APP_DIR = os.path.join(ROOT_DIR, "App")
+DIST_DIR = os.path.join(ROOT_DIR, "dist")
+BUILD_DIR = os.path.join(ROOT_DIR, "build")
 
-APP_DIR = "App"
-sys.path.append(os.path.abspath(APP_DIR))
+# Aggiungiamo App al sys.path per permettere l'import di astropy pre-build
+sys.path.append(APP_DIR)
 
-from astropy.utils import iers
+try:
+    from astropy.utils import iers
+    os.environ['ASTROPY_SKIP_INTERNET_DOWNLOADS'] = '1'
+    os.environ['ASTROPY_ALLOW_INTERNET'] = 'False'
+    iers.conf.auto_download = False
+except ImportError:
+    pass
 
-os.environ['ASTROPY_SKIP_INTERNET_DOWNLOADS'] = '1'
-os.environ['ASTROPY_ALLOW_INTERNET'] = 'False'
-iers.conf.auto_download = False
 APP_NAME = "Cosmo-Edu_Lab"
-
 
 current_os = platform.system()
 if current_os == 'Windows':
@@ -32,8 +39,14 @@ else:
 
 FINAL_OUTPUT_NAME = f"{APP_NAME}{os_suffix}"
 
-
 print(f"Analisi dipendenze complesse per {current_os}...")
+
+# -------------------------------------------------------------------
+# IL TRUCCO È QUI: Ci spostiamo dentro 'App/' per replicare 
+# l'esatto comportamento di PyInstaller in locale.
+# -------------------------------------------------------------------
+print(f"Spostamento nella directory {APP_DIR} per replicare l'ambiente locale...")
+os.chdir(APP_DIR)
 
 # Astroquery e Astropy
 astroquery_datas = collect_data_files('astroquery')
@@ -43,24 +56,25 @@ toolkit_datas = collect_data_files('nicegui_toolkit')
 latex_datas = collect_data_files('latex2mathml')
 imageio_datas = collect_data_files('imageio')
 
+# Usiamo i percorsi relativi esattamente come in build.py (visto che ora siamo dentro App)
 my_datas = [
-    (os.path.join(APP_DIR, 'static'), 'static'),           
-    (os.path.join(APP_DIR, 'images'), 'images'),           
-    (os.path.join(APP_DIR, 'data'), 'data'),               
-    (os.path.join(APP_DIR, 'dataset'), 'dataset'), 
-    (os.path.join(APP_DIR, 'galaxy_data'), 'galaxy_data'), 
-    (os.path.join(APP_DIR, 'cluster_data'), 'cluster_data'),
-    (os.path.join(APP_DIR, 'cluster_tables'), 'cluster_tables'),
-    (os.path.join(APP_DIR, 'iso_fe0.01'), 'iso_fe0.01'),
-    (os.path.join(APP_DIR, 'pages'), 'pages'),
-    (os.path.join(APP_DIR, 'galaxy_spectra'), 'galaxy_spectra'),
-    (os.path.join(APP_DIR, 'planet_image'), 'planet_image'),
-    (os.path.join(APP_DIR, 'galaxy_img'), 'galaxy_img'),
-    (os.path.join(APP_DIR, 'cluster_img'), 'cluster_img'),
-    (os.path.join(APP_DIR, 'galaxy_tables'), 'galaxy_tables'),
-    (os.path.join(APP_DIR, 'slides'), 'slides'),
-    (os.path.join(APP_DIR, 'discovery_images'), 'discovery_images'),
-    (os.path.join(APP_DIR, 'cosmic_epochs'), 'cosmic_epochs'),
+    ('static', 'static'),           
+    ('images', 'images'),           
+    ('data', 'data'),               
+    ('dataset', 'dataset'), 
+    ('galaxy_data', 'galaxy_data'), 
+    ('cluster_data', 'cluster_data'),
+    ('cluster_tables', 'cluster_tables'),
+    ('iso_fe0.01', 'iso_fe0.01'),
+    ('pages', 'pages'),
+    ('galaxy_spectra', 'galaxy_spectra'),
+    ('planet_image', 'planet_image'),
+    ('galaxy_img', 'galaxy_img'),
+    ('cluster_img', 'cluster_img'),
+    ('galaxy_tables', 'galaxy_tables'),
+    ('slides', 'slides'),
+    ('discovery_images', 'discovery_images'),
+    ('cosmic_epochs', 'cosmic_epochs'),
 ]
 
 all_datas = my_datas + astroquery_datas + astropy_datas + plotly_datas + toolkit_datas + latex_datas + imageio_datas
@@ -93,19 +107,23 @@ add_data_args = []
 separator = ';' if current_os == 'Windows' else ':' 
 
 for source, dest in all_datas:
-    if os.path.exists(source):
+    # Aggiungiamo un controllo che supporta sia i percorsi relativi che quelli assoluti
+    if os.path.exists(source) or os.path.isabs(source):
         add_data_args.append(f'--add-data={source}{separator}{dest}')
     else:
         print(f"WARNING: Data source not found: {source}")
 
 hidden_import_args = [f'--hidden-import={mod}' for mod in hidden_imports]
 
+# Costruiamo gli argomenti finali
 args = [
-    os.path.join(APP_DIR, 'main.py'),                  
+    'main.py',                  # Nota: ora puntiamo solo a 'main.py' e non ad 'App/main.py'
     f'--name={FINAL_OUTPUT_NAME}',       
     '--onefile',                
     '--clean',                  
     '--optimize=1',
+    f'--distpath={DIST_DIR}',   # Indirizziamo l'output verso la root (per GitHub Actions)
+    f'--workpath={BUILD_DIR}',  # Idem per le cartelle di cache temporanee
     '--collect-all=nicegui',          
     '--collect-all=nicegui_toolkit', 
     '--collect-all=xyz_services',
@@ -114,7 +132,6 @@ args = [
     '--collect-all=pyvo',
 ] + add_data_args + hidden_import_args
 
-
 if current_os == 'Windows':
     args.append('--windowed')
 
@@ -122,6 +139,6 @@ print(f"\nAvvio build completo con supporto per {len(hidden_imports)} librerie s
 
 try:
     PyInstaller.__main__.run(args)
-    print(f"\nSUCCESSO! Trovi il file in: dist/{FINAL_OUTPUT_NAME}{ext}")
+    print(f"\nSUCCESSO! Trovi il file in: {DIST_DIR}/{FINAL_OUTPUT_NAME}{ext}")
 except Exception as e:
     print(f"\nERRORE durante il build: {e}")
