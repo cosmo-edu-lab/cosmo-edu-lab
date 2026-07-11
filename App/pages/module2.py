@@ -171,7 +171,7 @@ def create_page():
 
         try:
            
-            logM_sol = brentq(to_solve, 8, 15)
+            logM_sol = brentq(to_solve, 6, 16)
         except (ValueError, RuntimeError):
            
             logM_sol = 11.5 
@@ -2156,6 +2156,18 @@ def create_page():
                             
                             if gal_state['r_ngc'].size > 0:
                                 gal_state['r_match'] = gal_state['r_ngc'][-1]
+                                
+                               
+                                rho_s, r_s, _ = get_rhos_rs_from_observed_matching(
+                                    gal_state['r_ngc'], gal_state['v_obs_ngc'], 
+                                    gal_state['v_gas_ngc'], gal_state['v_disk_ngc'], 
+                                    gal_state['v_bul_ngc'], gal_state['r_match']
+                                )
+                                gal_state['base_rho_s'] = rho_s
+                                gal_state['base_r_s'] = r_s
+                                gal_state['base_M_dm_grid'] = M_nfw_enclosed(gal_state['r_ngc'], rho_s, r_s)
+                               
+                                
                                 gal_state['DATA_LOADED'] = True
                                 return True
                             return False
@@ -2252,16 +2264,15 @@ def create_page():
                             selected_file = gal_state['selected_file']
                             chi2_points = gal_state['chi2_points']
                             manual_points = gal_state['manual_points']
+                            
                             if r_array is None:
                                 r_array = r_ngc 
+                          
+                            rho_s = gal_state.get('base_rho_s', 0.0)
+                            r_s = gal_state.get('base_r_s', 1.0)
+                            M_dm_grid_full = gal_state.get('base_M_dm_grid', np.zeros_like(r_ngc))
+                       
                             
-                            rho_s, r_s, _ = get_rhos_rs_from_observed_matching(
-                                r_ngc, v_obs_ngc, v_gas_ngc, v_disk_ngc, v_bul_ngc, r_match
-                            )
-                            
-                            M_dm_grid_full = M_nfw_enclosed(r_ngc, rho_s=rho_s, r_s=r_s)
-                            
-                        
                             if len(r_array) != len(M_dm_grid_full):
                                 M_dm_grid_interp = np.interp(r_array, r_ngc, M_dm_grid_full)
                             else:
