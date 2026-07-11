@@ -310,20 +310,21 @@ def create_page():
 
        
         #s.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg-full.js';
-        main_layout("Introduction to Cosmology")
         tab_key = 'module1_selected'
         if tab_key not in app.storage.user:
             app.storage.user[tab_key] = 'intro'
+            
         with ui.tabs().classes('w-full justify-center').bind_value(app.storage.user, tab_key) as tabs: 
             ui.tab('intro', label='Structures of Universe').props('aria-label="Structures of Universe"')
             ui.tab('discovery', label='Discoveries Timeline').props('aria-label="Discoveries Timeline"')
             ui.tab('universe', label='Universe Evolution').props('aria-label="Universe Evolution"')
             ui.tab('instrument', label='Observational Methods').props('aria-label="Observational Instruments and Methods"')
-            
             ui.tab('galaxy', label='Galaxies ').props('aria-label="Galaxy Map"')
             ui.tab('milky_way', label='Milky Way').props('aria-label="Milky Way"')
             ui.tab('stars', label='Stars ').props('aria-label="Stars Map"')
-            ui.tab('particles', label='Fundamental Particles').props('aria-label="Fundamental Particles"')
+            ui.tab('particles', label='Fundamental Particles').props('aria-label="Fundamental Particles"') 
+            
+        
 #functions for observational methods and instruments dialog        
         def open_scientific_info_dialog():
             with ui.dialog() as scientific_dialog, ui.card().classes('p-0 w-full max-w-[1400px] h-[85vh] overflow-hidden').props('role=dialog aria-modal="true" aria-labelledby="title-dialog"'):
@@ -5444,24 +5445,31 @@ namelength=-1,
             
 
         
-        with ui.tab_panels(tabs, value='intro').classes('w-full !bg-transparent'):
+      
+        with ui.tab_panels(tabs, value=app.storage.user.get('module1_selected', 'intro')).classes('w-full !bg-transparent'):
+            
+           
             with ui.tab_panel('intro') as intro_panel:
                 introduction_page(intro_panel)
 
-
             with ui.tab_panel('discovery') as discovery_panel:
                 astronomy_timeline(discovery_panel)
+                
             with ui.tab_panel('universe') as history_panel:
                 cosmic_timeline(history_panel)
+                
             with ui.tab_panel('instrument') as instrument_panel:
                 instrument_page(instrument_panel)
-            
+                
             with ui.tab_panel('galaxy') as galaxy_panel:
                 galaxy_map_page(galaxy_panel)
+                
             with ui.tab_panel('milky_way') as planets_panel:
                 planets_page(planets_panel)
+                
             with ui.tab_panel('stars') as star_panel:
-                hr_diagram_page(star_panel,STAR_GAIA_PATH)
+                hr_diagram_page(star_panel, STAR_GAIA_PATH)
+                
             with ui.tab_panel('particles') as particle_panel:
                 particle_page(particle_panel)
 

@@ -901,17 +901,22 @@ def create_page():
         main_layout("Dark Matter ")
         
         
-        with ui.column().classes('w-full p-4 gap-4'):
-            tab_key = 'module4_selected_tab'
-            if tab_key not in app.storage.user:
-                app.storage.user[tab_key] = 'kepler '
-            with ui.tabs().classes('w-full justify-center').bind_value(app.storage.user, tab_key) as tabs:
-                ui.tab('kepler',label='Kepler laws planets').props('role=tab aria-selected=true'), ui.tab('gal',label='Galaxy rotation curve').props('role=tab aria-selected=false'), ui.tab('galdm',label='Galaxy mass & DM').props('role=tab aria-selected=false'), ui.tab('cluster',label='Cluster velocity distribution').props('role=tab aria-selected=false'), ui.tab('clusdm',label='Cluster mass & DM').props('role=tab aria-selected=false').props('role=tab aria-selected=false')
+        tab_key = 'module2_selected' 
         
+        if tab_key not in app.storage.user:
+        
+            app.storage.user[tab_key] = 'kepler' 
+            
+        with ui.tabs().classes('w-full justify-center').bind_value(app.storage.user, tab_key) as tabs:
+            ui.tab('kepler', label='Kepler laws planets').props('role=tab aria-selected=true')
+            ui.tab('gal', label='Galaxy rotation curve').props('role=tab aria-selected=false')
+            ui.tab('galdm', label='Galaxy mass & DM').props('role=tab aria-selected=false')
+            ui.tab('cluster', label='Cluster velocity distribution').props('role=tab aria-selected=false')
+            ui.tab('clusdm', label='Cluster mass & DM').props('role=tab aria-selected=false')
 
-            with ui.tab_panels(tabs, value='kepler').classes('w-full !bg-transparent'):
-                
-     #panel kepler           
+        with ui.column().classes('w-full p-4 gap-4'):
+      
+            with ui.tab_panels(tabs, value=app.storage.user.get(tab_key, 'kepler')).classes('w-full !bg-transparent'):
                 with ui.tab_panel('kepler').props('role=tabpanel'):
                     #with ui.card().classes("p-4 !bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg shadow-lg"):
                     ui.label("Review the Kepler's Laws and planetary motion to derive the orbital velocity.").classes('font-bold text-3xl text-blue-100 mt-4 drop-shadow-md text-center whitespace-pre-wrap w-full').props('role=heading aria-level=2 tabindex=0')

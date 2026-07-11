@@ -6,7 +6,7 @@ import io
 import json
 import nicegui
 from nicegui import ui, app, run , client
-
+import asyncio
 import datetime
 from groq import Groq
 import urllib.parse
@@ -126,7 +126,28 @@ def create_routes():
                 ]
             }
 
-           
+            
+            def handle_card_click(mod):
+                """Quando si clicca sulla CARD principale, forza il ritorno al primo panel di default"""
+                key = 'module1_selected' if mod == 1 else 'module2_selected'
+                default_val = 'intro' if mod == 1 else 'kepler'  # I primi pannelli di Modulo 1 e 2
+                
+                app.storage.user[key] = default_val
+                
+               
+                ui.timer(0.1, lambda: (
+                    ui.navigate.to(f'/module{mod}'),
+                    ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
+                ), once=True)
+
+            def handle_dropdown_click(mod, key, val):
+                """Quando si sceglie una voce dal Quick Access, imposta il pannello specifico"""
+                app.storage.user[key] = val
+                
+                ui.timer(0.1, lambda: (
+                    ui.navigate.to(f'/module{mod}'),
+                    ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
+                ), once=True)
             with ui.grid(columns=4).classes('w-full justify-center gap-10 mt-8 mb-8 flex-wrap'):
                 module_titles = [
                     "Introduction to Cosmology","Dark Matter","Universe History & CMB" ,"Redshift & Universe Expansion"
@@ -148,7 +169,6 @@ def create_routes():
                     if is_locked:
                         current_style = current_style.replace('cursor-pointer', 'cursor-not-allowed') + ' opacity-75 grayscale'
                     
-                    # Usa la classe CSS nativa "modulo-container"
                     with ui.element('div').classes('modulo-container'):
 
                         card = ui.card().classes(current_style).props(
@@ -161,14 +181,9 @@ def create_routes():
                             card.on('click', show_coming_soon)
                             card.on('keydown.enter', show_coming_soon)
                         else:
-                            card.on('click', lambda i=i: (
-                                ui.navigate.to(f'/module{i}'), 
-                                ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
-                            ))
-                            card.on('keydown.enter', lambda i=i: (
-                                ui.navigate.to(f'/module{i}'), 
-                                ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
-                            ))
+                          
+                            card.on('click', lambda e, idx=i: handle_card_click(idx))
+                            card.on('keydown.enter', lambda e, idx=i: handle_card_click(idx))
                         
                         with card: 
                             if is_locked:
@@ -178,41 +193,31 @@ def create_routes():
                             
                             ui.label(title).classes('text-2xl font-semibold text-slate-800 leading-tight')
 
-                        # Il menu a tendina che appare in hover (usa la classe "menu-tendina")
                         if i in module_panels and not is_locked:
                             with ui.column().classes(
                                 "menu-tendina flex-col gap-2 p-4 "
                                 "bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-blue-400/40 "
                                 "shadow-[0_20px_50px_rgba(0,0,0,0.8)]"
                             ):
-                                # Triangolino decorativo verso l'alto
+                               
                                 ui.element('div').classes("absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-slate-900 rotate-45 border-t border-l border-blue-400/40")
                                 
                                 ui.label('Quick Access').classes('text-blue-300 text-xs font-bold uppercase tracking-widest text-center w-full mb-1 border-b border-blue-500/30 pb-2')
                                 
                                 tab_storage_key = 'module1_selected' if i == 1 else 'module2_selected'
                                 
+                              
                                 for tab_val, tab_label, icon in module_panels[i]:
-                                    # Funzione di navigazione ai singoli pannelli
-                                    def create_nav_handler(mod_idx, tk, tv):
-                                        def handler():
-                                            app.storage.user[tk] = tv
-                                            ui.navigate.to(f'/module{mod_idx}')
-                                            ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
-                                        return handler
-
+                                    
                                     ui.button(
                                         f"{icon} {tab_label}", 
-                                        on_click=create_nav_handler(i, tab_storage_key, tab_val)
+                                      
+                                        on_click=lambda e, m=i, k=tab_storage_key, v=tab_val: handle_dropdown_click(m, k, v)
                                     ).classes(
                                         'w-full !bg-blue-800/30 hover:!bg-blue-600/60 text-blue-100 '
                                         'font-semibold border border-blue-500/20 rounded-lg '
                                         'transition-all duration-200 text-sm px-4 py-2 flex justify-start text-left'
                                     ).props('flat no-caps')
-            
-       
-                
-      
             
         ui.label    (
                 "Cosmo-Edu Lab is your interactive platform to explore the Universe.\n\n"
