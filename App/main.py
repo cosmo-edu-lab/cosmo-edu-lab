@@ -9,6 +9,8 @@ import asyncio
 import sys
 import asyncio
 if getattr(sys, 'frozen', False):
+  
+    os.chdir(sys._MEIPASS)
     BASE_DIR = sys._MEIPASS
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
