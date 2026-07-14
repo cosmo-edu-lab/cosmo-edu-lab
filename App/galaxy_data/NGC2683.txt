@@ -1,4 +1,4 @@
- Rad	Vobs	errV	Vgas	Vdisk	Vbul	SBdisk	SBbul
+Rad	Vobs	errV	Vgas	Vdisk	Vbul	SBdisk	SBbul
 2.89	189.00	10.00	7.68	203.92	89.57	755.39	0.00
 5.77	212.00	5.00	21.36	229.24	63.44	149.71	0.00
 8.66	206.00	5.00	17.89	197.87	51.78	56.22	0.00

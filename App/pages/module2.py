@@ -136,12 +136,16 @@ def create_page():
 
 
     def observed_rho_from_RC(r, Vobs, Vgas, Vdisk, Vbul):
-    
-        aD = np.where(r>0, Vdisk**2 / r, 0.0)
-        aHI = np.where(r>0, Vgas**2 / r, 0.0)
-        q = r**2 * ((np.where(r>0, Vobs**2 / r, 0.0)) - aD - aHI)
-        dqdr = np.gradient(q, r)
-        return dqdr / (4.0*np.pi*G_grav*r**2)
+   
+        V_bar_sq = Vgas * np.abs(Vgas) + Vdisk * np.abs(Vdisk) + Vbul * np.abs(Vbul)
+        
+       
+        V_DM_sq = np.maximum(Vobs**2 - V_bar_sq, 0) 
+        
+        q = r**2 * (V_DM_sq / r)
+        dq_dr = np.gradient(q, r)
+        rho_DM = (1.0 / (4.0 * np.pi * G_grav * r**2)) * dq_dr
+        return rho_DM
 
     def get_rhos_rs_from_observed_matching(r, Vobs, Vgas, Vdisk, Vbul, r_match, scale=0.3):
         if r.size == 0 or Vobs.size == 0:
@@ -2147,17 +2151,36 @@ def create_page():
 
                         
                          
-                            gal_state['r_ngc'] = pd.to_numeric(df['Rad'],  errors='coerce').values
-                            gal_state['v_obs_ngc'] = pd.to_numeric(df['Vobs'], errors='coerce').values
-                            gal_state['v_gas_ngc'] = pd.to_numeric(df['Vgas'], errors='coerce').values
-                            gal_state['v_disk_ngc'] = pd.to_numeric(df['Vdisk'], errors='coerce').values
-                            gal_state['v_bul_ngc'] = pd.to_numeric(df['Vbul'], errors='coerce').values
-                            gal_state['v_err_ngc'] = pd.to_numeric(df['errV'], errors='coerce').values
+                            #gal_state['r_ngc'] = pd.to_numeric(df['Rad'],  errors='coerce').values
+                            #gal_state['v_obs_ngc'] = pd.to_numeric(df['Vobs'], errors='coerce').values
+                            #gal_state['v_gas_ngc'] = pd.to_numeric(df['Vgas'], errors='coerce').values
+                            #gal_state['v_disk_ngc'] = pd.to_numeric(df['Vdisk'], errors='coerce').values
+                            #gal_state['v_bul_ngc'] = pd.to_numeric(df['Vbul'], errors='coerce').values
+                            #gal_state['v_err_ngc'] = pd.to_numeric(df['errV'], errors='coerce').values
                             
+                            gal_state['r_ngc'] = df['Rad'].values
+                            gal_state['v_obs_ngc'] = df['Vobs'].values
+                            gal_state['v_err_ngc'] = df['errV'].values
+
+                        
+                            gal_state['v_gas_ngc'] = df['Vgas'].values
+
+                         
+                            gal_state['v_disk_ngc'] = df['Vdisk'].values * np.sqrt(0.5)
+                            gal_state['v_bul_ngc'] = df['Vbul'].values * np.sqrt(0.7)
+
                             if gal_state['r_ngc'].size > 0:
-                                gal_state['r_match'] = gal_state['r_ngc'][-1]
-                                
                                
+                                rho_array = observed_rho_from_RC(
+                                    gal_state['r_ngc'], gal_state['v_obs_ngc'], 
+                                    gal_state['v_gas_ngc'], gal_state['v_disk_ngc'], gal_state['v_bul_ngc']
+                                )
+                                valid_idx = len(gal_state['r_ngc']) - 1
+                                while valid_idx > 0 and rho_array[valid_idx] <= 0:
+                                    valid_idx -= 1
+                                gal_state['r_match'] = gal_state['r_ngc'][valid_idx]
+                                
+                             
                                 rho_s, r_s, _ = get_rhos_rs_from_observed_matching(
                                     gal_state['r_ngc'], gal_state['v_obs_ngc'], 
                                     gal_state['v_gas_ngc'], gal_state['v_disk_ngc'], 
@@ -2165,8 +2188,8 @@ def create_page():
                                 )
                                 gal_state['base_rho_s'] = rho_s
                                 gal_state['base_r_s'] = r_s
+                              
                                 gal_state['base_M_dm_grid'] = M_nfw_enclosed(gal_state['r_ngc'], rho_s, r_s)
-                               
                                 
                                 gal_state['DATA_LOADED'] = True
                                 return True
@@ -2253,32 +2276,26 @@ def create_page():
                     
 
                     def get_dm_params(fraction, r_array=None):
-                            r_ngc = gal_state['r_ngc']
-                            v_obs_ngc = gal_state['v_obs_ngc']
-                            v_gas_ngc = gal_state['v_gas_ngc']
-                            v_bul_ngc = gal_state['v_bul_ngc']
-                            v_disk_ngc = gal_state['v_disk_ngc']
-                            v_err_ngc = gal_state['v_err_ngc']
-                            r_match = gal_state['r_match']
-                            current_galaxy_name = gal_state['current_galaxy_name']
-                            selected_file = gal_state['selected_file']
-                            chi2_points = gal_state['chi2_points']
-                            manual_points = gal_state['manual_points']
-                            
-                            if r_array is None:
-                                r_array = r_ngc 
-                          
-                            rho_s = gal_state.get('base_rho_s', 0.0)
-                            r_s = gal_state.get('base_r_s', 1.0)
-                            M_dm_grid_full = gal_state.get('base_M_dm_grid', np.zeros_like(r_ngc))
-                       
-                            
-                            if len(r_array) != len(M_dm_grid_full):
-                                M_dm_grid_interp = np.interp(r_array, r_ngc, M_dm_grid_full)
-                            else:
-                                M_dm_grid_interp = M_dm_grid_full
-                            
-                            return rho_s, r_s, M_dm_grid_interp
+                        r_ngc = gal_state['r_ngc']
+                        
+                      
+                        rho_s = gal_state.get('base_rho_s', 0.0)
+                        r_s = gal_state.get('base_r_s', 1.0)
+                        M_dm_grid_base = gal_state.get('base_M_dm_grid', np.zeros_like(r_ngc))
+                        
+                    
+                        M_dm_grid_scaled = M_dm_grid_base * fraction
+
+                        if r_array is None:
+                            r_array = r_ngc 
+                        
+                        if len(r_array) != len(M_dm_grid_scaled):
+                            M_dm_grid_interp = np.interp(r_array, r_ngc, M_dm_grid_scaled)
+                        else:
+                            M_dm_grid_interp = M_dm_grid_scaled
+                        
+                        return rho_s, r_s, M_dm_grid_interp
+
                     
                     #rho_s_init, r_s_init, _ = get_rhos_rs_from_observed_matching(                       r_ngc, v_obs_ngc, v_gas_ngc, v_disk_ngc, v_bul_ngc, r_match=r_match)
                     #M_dm_grid_init = M_nfw_enclosed(r_ngc, rho_s=rho_s_init, r_s=r_s_init)
