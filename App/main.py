@@ -5,7 +5,7 @@
 from nicegui import ui, app, client
 import os
 import asyncio
-
+import multiprocessing
 import sys
 import asyncio
 if getattr(sys, 'frozen', False):
@@ -99,6 +99,7 @@ app.on_startup(lambda: asyncio.create_task(keep_alive()))
 
 
 if __name__ in {"__main__", "__mp_main__"}:
+    multiprocessing.freeze_support()
     ui.run(
         host="0.0.0.0",
         port=7860,
