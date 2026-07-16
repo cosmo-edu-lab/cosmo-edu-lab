@@ -7,7 +7,7 @@ from functools import lru_cache
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Request
-from groq import Groq
+#from groq import Groq
 #from ipywidgets import interact, FloatSlider
 import nicegui
 from nicegui import ui, app, run , client

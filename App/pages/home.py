@@ -8,7 +8,7 @@ import nicegui
 from nicegui import ui, app, run , client
 import asyncio
 import datetime
-from groq import Groq
+#from groq import Groq
 import urllib.parse
 #from nicegui_toolkit import inject_layout_tool
 

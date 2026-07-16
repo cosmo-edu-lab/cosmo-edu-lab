@@ -48,7 +48,7 @@ import networkx as nx
 import requests
 from dotenv import load_dotenv
 from fastapi import Request
-from groq import Groq
+#from groq import Groq
 #from ipywidgets import interact, FloatSlider
 from nicegui import ui, app, run , client
 #from nicegui_toolkit import inject_layout_tool

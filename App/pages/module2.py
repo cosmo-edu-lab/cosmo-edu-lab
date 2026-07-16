@@ -52,7 +52,7 @@ import matplotlib.lines as mlines
 import requests
 from dotenv import load_dotenv
 from fastapi import Request
-from groq import Groq
+#from groq import Groq
 #from ipywidgets import interact, FloatSlider
 from nicegui import ui, app, run , client
 #from nicegui_toolkit import inject_layout_tool
@@ -61,7 +61,7 @@ from functools import lru_cache
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.cosmology import Planck15 as cosmo
-from astroquery.simbad import Simbad
+#from astroquery.simbad import Simbad
 import asyncio           
 import logging
 import layout
@@ -1559,7 +1559,7 @@ def create_page():
             'v_disk_ngc': np.array([]),
             'v_bul_ngc': np.array([]),
             'v_err_ngc': np.array([]),
-            'r_match': None,
+         
             'DATA_LOADED': False,
             'current_galaxy_name': None,
             'selected_file': None,
@@ -1804,62 +1804,59 @@ def create_page():
             .math-num { border-bottom: 1px solid black; padding-bottom: 2px; }
             .math-den { padding-top: 2px; }
         </style>
-        <h3>Computational Notes</h3>
-        
-        <ul>
-            <li>
-                <b>Step 1:</b> Baryonic velocity (from data)<br>
-                <span class="math">\( v_{\mathrm{bar}}^2(r) = v_{\mathrm{gas}}^2(r) + v_{\mathrm{disk}}^2(r) + v_{\mathrm{bulge}}^2(r) \)</span>
-            </li>
-            
-            <li>
-                <b>Step 2:</b> Baryonic mass<br>
-                <span class="math">\( M_{\mathrm{bar}}(r) = \frac{r \, v_{\mathrm{bar}}^2(r)}{G} \)</span>
-            </li>
-            
-            <li>
-                <b>Step 3:</b> Total observed mass from velocity data<br>
-                <span class="math">\( M_{\mathrm{tot}}(r) = \frac{r \, v_{\mathrm{obs}}^2(r)}{G} \)</span>
-            </li>
-            
-            <li>
-                <b>Step 4:</b> Observed dark matter density (from data)<br>
-                <span class="math">\( \rho_{\mathrm{DM}}(r) = \frac{1}{4 \pi G r^2} \, \frac{d}{dr} \Bigg[ r^2 \Big( \frac{v_{\mathrm{obs}}^2(r)}{r} - \frac{v_{\mathrm{gas}}^2(r)}{r} - \frac{v_{\mathrm{disk}}^2(r)}{r} - \frac{v_{\mathrm{bulge}}^2(r)}{r} \Big) \Bigg] \)</span>
-            </li>
-            
-            <li>
-                <b>Step 5:</b> NFW dark matter profile<br>
-                <span class="math">\( \rho_{\mathrm{NFW}}(r) = \frac{\rho_s}{\left(\tfrac{r}{r_s}\right)\left(1 + \tfrac{r}{r_s}\right)^2} \)</span> <br>
-                with <span class="math">\( \alpha=1, \beta=3, \gamma=1 \)</span>, <span class="math">\( R_{200} = \left[\tfrac{3 M_{200}}{4\pi \cdot 200 \rho_{\mathrm{crit}}}\right]^{1/3}, \;\; r_s = \tfrac{R_{200}}{c} \)</span>, <br>
-                <span class="math">\( c = 0.3 \times 11.7 \left(\tfrac{M_{200}}{10^{11} M_\odot}\right)^{-0.075} \)</span>
-            </li>
-            
-            <li>
-                <b>Step 6:</b> Match observed density with NFW<br>
-                <span class="math">\( \rho_{\mathrm{NFW}}(r_{\mathrm{match}}) = \rho_{\mathrm{DM}}(r_{\mathrm{match}}) \)</span> → Obtain <span class="math">\( M_{200}, \rho_s, r_s \)</span>
-            </li>
-            
-            <li>
-                <b>Step 7:</b> Enclosed dark matter mass (NFW)<br>
-                <span class="math">\( M_{\mathrm{DM}}(r) = 4 \pi \rho_s r_s^3 \left[\ln(1+x) - \frac{x}{1+x}\right], \;\; x = \tfrac{r}{r_s} \)</span>
-            </li>
-            
-            <li>
-                <b>Step 8:</b> Dark matter rotational velocity<br>
-                <span class="math">\( v_{\mathrm{DM}}(r) = \sqrt{\frac{G M_{\mathrm{DM}}(r)}{r}} \)</span>
-            </li>
-            
-            <li>
-                <b>Step 9:</b> Total simulated velocity curve (linked to DM slider)<br>
-                <span class="math">\( v_{\mathrm{tot,sim}}(r) = \sqrt{\tfrac{G \, (M_{\mathrm{bar}}(r) + f\,M_{\mathrm{DM}}(r))}{r}}, \;\; f \in [0,1] \)</span>
-            </li>
-            
-            <li>
-                <b>Step 10:</b> Fit quality (χ²/d.o.f)<br>
-                <span class="math">\( \chi^2 = \sum_i \left(\tfrac{v_{\mathrm{obs}}(r_i) - v_{\mathrm{tot,sim}}(r_i)}{\sigma_i}\right)^2, \;\; \chi^2_{\mathrm{dof}} = \tfrac{\chi^2}{N_{\mathrm{obs}} - N_{\mathrm{params}}} \)</span>
-            </li>
-        </ul>
-
+       <h3>Computational Notes</h3>
+                                        
+                                        <ul>
+                                            <li>
+                                                <b>Step 1:</b> Baryonic velocity with Mass-to-Light ratio (\( \Upsilon \))<br>
+                                                <span class="math">\( v_{\mathrm{bar}}^2(r) = v_{\mathrm{gas}}(r)|v_{\mathrm{gas}}(r)| + \Upsilon \left[ v_{\mathrm{disk}}(r)|v_{\mathrm{disk}}(r)| + v_{\mathrm{bulge}}(r)|v_{\mathrm{bulge}}(r)| \right] \)</span>
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 2:</b> Baryonic mass<br>
+                                                <span class="math">\( M_{\mathrm{bar}}(r) = \frac{r \, \max(v_{\mathrm{bar}}^2(r), 0)}{G} \)</span>
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 3:</b> Total observed mass from velocity data<br>
+                                                <span class="math">\( M_{\mathrm{tot}}(r) = \frac{r \, v_{\mathrm{obs}}^2(r)}{G} \)</span>
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 4:</b> Observed dark matter density (from data)<br>
+                                                <span class="math">\( \rho_{\mathrm{DM}}(r) = \frac{1}{4 \pi G r^2} \, \frac{d}{dr} \Bigg[ r^2 \Big( \frac{v_{\mathrm{obs}}^2(r) - v_{\mathrm{bar}}^2(r)}{r} \Big) \Bigg] \)</span>
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 5:</b> NFW dark matter profile<br>
+                                                <span class="math">\( \rho_{\mathrm{NFW}}(r) = \frac{\rho_s}{\left(\tfrac{r}{r_s}\right)\left(1 + \tfrac{r}{r_s}\right)^2} \)</span> 
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 6:</b> Global Fit parameters<br>
+                                                The structural parameters \( \rho_s, r_s \) and \( \Upsilon \) are pre-calculated via a global \( \chi^2 \) minimization on the entire rotation curve dataset.
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 7:</b> Enclosed dark matter mass (NFW)<br>
+                                                <span class="math">\( M_{\mathrm{DM}}(r) = 4 \pi \rho_s r_s^3 \left[\ln(1+x) - \frac{x}{1+x}\right], \;\; x = \tfrac{r}{r_s} \)</span>
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 8:</b> Dark matter rotational velocity<br>
+                                                <span class="math">\( v_{\mathrm{DM}}(r) = \sqrt{\frac{G M_{\mathrm{DM}}(r)}{r}} \)</span>
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 9:</b> Total simulated velocity curve (linked to DM slider)<br>
+                                                <span class="math">\( v_{\mathrm{tot,sim}}(r) = \sqrt{\tfrac{G \, (M_{\mathrm{bar}}(r) + f\,M_{\mathrm{DM}}(r))}{r}}, \;\; f \in [0,2] \)</span>
+                                            </li>
+                                            
+                                            <li>
+                                                <b>Step 10:</b> Fit quality (χ²/d.o.f)<br>
+                                                <span class="math">\( \chi^2 = \sum_i \left(\tfrac{v_{\mathrm{obs}}(r_i) - v_{\mathrm{tot,sim}}(r_i)}{\sigma_i}\right)^2 \)</span>
+                                            </li>
+                                        </ul>
         <h4>Plot Legend</h4>
         <ul>
             <li><b>X-axis:</b> Radius (data)</li>
@@ -2138,72 +2135,54 @@ def create_page():
                     
                     
                     def load_galaxy_data(filename):
-                      
-
-
                         try:
-                        
                             df = get_galaxy_data_cached(filename) 
 
                             if df is None:
                                 gal_state['DATA_LOADED']= False
-                                return None
+                                return False
 
-                        
-                         
-                            #gal_state['r_ngc'] = pd.to_numeric(df['Rad'],  errors='coerce').values
-                            #gal_state['v_obs_ngc'] = pd.to_numeric(df['Vobs'], errors='coerce').values
-                            #gal_state['v_gas_ngc'] = pd.to_numeric(df['Vgas'], errors='coerce').values
-                            #gal_state['v_disk_ngc'] = pd.to_numeric(df['Vdisk'], errors='coerce').values
-                            #gal_state['v_bul_ngc'] = pd.to_numeric(df['Vbul'], errors='coerce').values
-                            #gal_state['v_err_ngc'] = pd.to_numeric(df['errV'], errors='coerce').values
-                            
-                            gal_state['r_ngc'] = df['Rad'].values
-                            gal_state['v_obs_ngc'] = df['Vobs'].values
-                            gal_state['v_err_ngc'] = df['errV'].values
-
-                        
-                            gal_state['v_gas_ngc'] = df['Vgas'].values
-
-                         
-                            gal_state['v_disk_ngc'] = df['Vdisk'].values * np.sqrt(0.5)
-                            gal_state['v_bul_ngc'] = df['Vbul'].values * np.sqrt(0.7)
+                            gal_state['r_ngc'] = pd.to_numeric(df['Rad'], errors='coerce').values
+                            gal_state['v_obs_ngc'] = pd.to_numeric(df['Vobs'], errors='coerce').values
+                            gal_state['v_err_ngc'] = pd.to_numeric(df['errV'], errors='coerce').values
+                            gal_state['v_gas_ngc'] = pd.to_numeric(df['Vgas'], errors='coerce').values
+                            gal_state['v_disk_ngc'] = pd.to_numeric(df['Vdisk'], errors='coerce').values
+                            gal_state['v_bul_ngc'] = pd.to_numeric(df['Vbul'], errors='coerce').values
 
                             if gal_state['r_ngc'].size > 0:
+                                gal_name = os.path.splitext(filename)[0]
                                
-                                rho_array = observed_rho_from_RC(
-                                    gal_state['r_ngc'], gal_state['v_obs_ngc'], 
-                                    gal_state['v_gas_ngc'], gal_state['v_disk_ngc'], gal_state['v_bul_ngc']
-                                )
-                                valid_idx = len(gal_state['r_ngc']) - 1
-                                while valid_idx > 0 and rho_array[valid_idx] <= 0:
-                                    valid_idx -= 1
-                                gal_state['r_match'] = gal_state['r_ngc'][valid_idx]
-                                
-                             
-                                rho_s, r_s, _ = get_rhos_rs_from_observed_matching(
-                                    gal_state['r_ngc'], gal_state['v_obs_ngc'], 
-                                    gal_state['v_gas_ngc'], gal_state['v_disk_ngc'], 
-                                    gal_state['v_bul_ngc'], gal_state['r_match']
-                                )
+                                try:
+                                    df_params = pd.read_csv('galaxy_best_parameters.csv')
+                                    row = df_params[df_params['Galaxy'] == gal_name]
+                                    if not row.empty:
+                                        rho_s = float(row.iloc[0]['rho_s'])
+                                        r_s = float(row.iloc[0]['r_s'])
+                                        y_opt = float(row.iloc[0]['Upsilon'])
+                                    else:
+                                        rho_s, r_s, y_opt = 1e6, 5.0, 1.0 
+                                except Exception:
+                                    rho_s, r_s, y_opt = 1e6, 5.0, 1.0  
+
                                 gal_state['base_rho_s'] = rho_s
                                 gal_state['base_r_s'] = r_s
-                              
+                                gal_state['upsilon'] = y_opt
+                                
                                 gal_state['base_M_dm_grid'] = M_nfw_enclosed(gal_state['r_ngc'], rho_s, r_s)
                                 
                                 gal_state['DATA_LOADED'] = True
                                 return True
-                            return False
+                            else:
+                                gal_state['DATA_LOADED'] = False
+                                return False
                            
-                        
                         except Exception as ex:
                             print("Errore:", ex)
                             gal_state['DATA_LOADED'] = False
                             return False
+                        
+                        
                     def reload_galaxy(new_value):
-                    
-                  
-
                         if not new_value: return
             
                         loaded = load_galaxy_data(new_value)
@@ -2212,34 +2191,25 @@ def create_page():
                             gal_state['selected_file'] = new_value
                             galaxy_state['select'] = new_value 
                             gal_state['current_galaxy_name'] = new_value
-                            max_vel = np.nanmax(gal_state['v_obs_ngc'])
                             
-                           
-                            #new_max_gal = max(2.0, (max_vel / 40.0)**2)
-                            new_max_gal=2
+                            new_max_gal = 2.0
                           
                             alpha_slider.max = round(new_max_gal, 1)
                             alpha_slider.step = round(new_max_gal / 100.0, 2)
                             alpha_slider.value = 0.0 
                             alpha_slider.update()
                             
-                         
                             gal_state['chi2_points'].clear()
                             gal_state['manual_points'].clear()
                             chi2_state['slider_result'] = "Add points to find the minimum."
-                            #alpha_slider.value = 0.0 
                             update_all_plots.refresh()
                             update_image.refresh()
                             update_table.refresh()
                     
                 
-
-
                     @ui.refreshable
                     def update_all_plots():
-                      
                         if not gal_state['DATA_LOADED']:
-                          
                             return
                         plt.close('all')
                         try:
@@ -2247,9 +2217,7 @@ def create_page():
                             update_mass_plot()
                             plot_chi2_user_curve()
                             update_morphology_plot()
-                            #update_morphology_plot_3d()
                         except Exception as ex:
-                           
                             import traceback; traceback.print_exc()
                             accessible_notify(f"Error: {ex}", type_='error')
 
@@ -2257,33 +2225,22 @@ def create_page():
                     
                     if not loaded:
                         print(f"Error:  file {default_galaxy} not loaded correctly.")
-                       
                     else:
-                       
                         pass
+                        
                     galaxy_select.on_value_change(lambda e: reload_galaxy(e.value))
-
                     alpha_slider.on('update:model-value', update_all_plots.refresh)
-                    
                     
                     if default_galaxy:
                         reload_galaxy(default_galaxy)
-                    
-                    
 
-                        #print("startup: current_galaxy_name impostato a default ->", current_galaxy_name)
-
-                    
 
                     def get_dm_params(fraction, r_array=None):
                         r_ngc = gal_state['r_ngc']
-                        
-                      
                         rho_s = gal_state.get('base_rho_s', 0.0)
                         r_s = gal_state.get('base_r_s', 1.0)
                         M_dm_grid_base = gal_state.get('base_M_dm_grid', np.zeros_like(r_ngc))
                         
-                    
                         M_dm_grid_scaled = M_dm_grid_base * fraction
 
                         if r_array is None:
@@ -2297,11 +2254,12 @@ def create_page():
                         return rho_s, r_s, M_dm_grid_interp
 
                     
-                    #rho_s_init, r_s_init, _ = get_rhos_rs_from_observed_matching(                       r_ngc, v_obs_ngc, v_gas_ngc, v_disk_ngc, v_bul_ngc, r_match=r_match)
-                    #M_dm_grid_init = M_nfw_enclosed(r_ngc, rho_s=rho_s_init, r_s=r_s_init)
                     rho_s_init, r_s_init, M_dm_grid_init = get_dm_params(f)
 
-                    dm_max_possible = np.max(M_dm_grid_init) * 2  
+                    if len(M_dm_grid_init) > 0:
+                        dm_max_possible = np.max(M_dm_grid_init) * 2  
+                    else:
+                        dm_max_possible = 10.0  
                     
                     chi2_max_possible = 10  
                     slider_max_gal = getattr(alpha_slider, 'max', 10.0)
@@ -2312,7 +2270,6 @@ def create_page():
                     y_max_chi = chi2_max_possible
                         
                     unscaled_M_dm_grid_cache = {}
-                    #chi2_plot_container = ui.column().classes('w-full')
                     
                     def plot_chi2_user_curve():
                       
@@ -2381,7 +2338,6 @@ def create_page():
                                         ax.scatter([xmin_manual], [ymin_manual], c='red', s=120, marker='*', zorder=4, label=" Min")
                                         all_xs.append(xmin_manual)
                                         all_ys.append(ymin_manual)
-                                        # result_label.set_text(f"DM min ≈ {xmin_manual:.3e}, χ² min ≈ {ymin_manual:.4f}") # Decommentare se usato
                                     else:
                                         ax.plot(x_fit_manual, y_fit_manual, "r--", lw=2, label="Invalid Fit")
 
@@ -2399,8 +2355,7 @@ def create_page():
                                     
                                     ax.set_xlim(x_min_chi, x_max_chi)
                                     ax.set_ylim(y_min_chi, y_max_chi)
-                                #ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
-                                #ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
+                                
                                 ax.set_xlabel(r" $M_{DM}/M_{tot}$", fontsize=10)
                                 ax.set_ylabel(r"χ²/dof", fontsize=10)
                                 ax.grid(True)
@@ -2416,13 +2371,12 @@ def create_page():
                                          color='green',
                                          fontweight='bold',
                                          horizontalalignment='center',
-                                         verticalalignment='top',     
+                                         verticalalignment='top',    
                                          bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9, edgecolor='lightgray'))
                                 
                                 plt.title("χ² Minimization",fontsize=12,fontweight='bold')
                                 plt.tight_layout()
                                 ui.element('div').props('role=status aria-live=polite tabindex=0 aria-label=Plot showing chi-square minimization curve; X axis is dark matter mass in solar masses, Y axis is chi-square per degree of freedom')
-
 
             
                     
@@ -2628,33 +2582,36 @@ def create_page():
                             f = float(alpha_slider.value)
                             G_grav = 4.30091e-6
                             
-                            v_baryonic = np.sqrt(np.maximum(0, v_gas_ngc)**2 + np.maximum(0, v_disk_ngc)**2 + np.maximum(0, v_bul_ngc)**2)
+                            y_opt = gal_state.get('upsilon', 1.0)
+    
+                            
+                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
+                            v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                             m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
-                            m_total_obs = (v_obs_ngc**2 * r_ngc) / G_grav
                             
-                         
-                            M_tot_obs_max = np.nanmax(m_total_obs)
-                            M_dm_tot = f * M_tot_obs_max
-                            M_vis_tot = np.max(m_baryonic)
+                           
+                            rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
+                            v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
                             
-                         
-                            rho_s, r_s, M_dm_grid = get_dm_params(1.0, r_array=r_ngc)
-                            max_grid = np.max(M_dm_grid)
-                            f_NFW = M_dm_tot / max_grid if max_grid > 0 else 0
-                            
-                            v_total_curve = np.sqrt(G_grav * (m_baryonic + f_NFW * M_dm_grid) / r_ngc)
+                            # --- CORREZIONE QUI: estrazione dei singoli valori massimi per il testo ---
+                            M_dm_tot = np.nanmax(M_dm_grid_f) if len(M_dm_grid_f) > 0 else 0
+                            m_total_model = m_baryonic + M_dm_grid_f 
+                            val_m_tot = np.nanmax(m_total_model) if len(m_total_model) > 0 else 0
+                            val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
+                            # -------------------------------------------------------------------------
                             
                             clean_name = current_galaxy_name.removesuffix('.txt').removesuffix('.csv')
                             galaxy_title_label.set_text(f"Galaxy Info: {clean_name}")
                            
                             galaxy_info_content.clear()
                             with galaxy_info_content:
+                                # --- CORREZIONE QUI: uso val_m_tot e val_m_bar invece degli array ---
                                 html_info_box(f"""
                                     <ul class="list-none pl-2 space-y-1 text-sm text-gray-800">
-                                        <li><b>M<sub>tot</sub>:</b> {format_sci(M_tot_obs_max)} M<sub>☉</sub></li>
+                                        <li><b>M<sub>tot</sub>:</b> {format_sci(val_m_tot)} M<sub>☉</sub></li>
                                         <li><b>M<sub>DM</sub>:</b> {format_sci(M_dm_tot)} M<sub>☉</sub></li>
                                        
-                                        <li><b>M<sub>bar</sub>:</b> {format_sci(M_vis_tot)} M<sub>☉</sub></li>
+                                        <li><b>M<sub>bar</sub>:</b> {format_sci(val_m_bar)} M<sub>☉</sub></li>
                                        <li><b>v<sub>obs,mean</sub>:</b> {np.nanmean(v_obs_ngc):.1f} km/s</li>
                                         <li><b>v<sub>sim,mean</sub>:</b> {np.nanmean(v_total_curve):.1f} km/s</li>
                                     </ul>
@@ -2688,8 +2645,11 @@ def create_page():
 
                             ui.run_javascript(f"window.vObsSeries = {v_obs_list}; window.vBarySeries = {v_bary_list}; window.vSimSeries = {v_total_list}; window.vObsMean = {v_obs_mean}; window.vBarMean = {v_bary_mean}; window.vSimMean = {v_total_mean}; window.vDiffSeries = {v_diff_list}; window.vDiffMean = {v_diff_mean};")
 
-                            alpha_slider.props(f'label-value="DM / Mₜₒₜ: {f:.2f}"')
+                            #alpha_slider.props(f'label-value="DM / Mₜₒₜ: {f:.2f}"')
+                            dm_ratio_gal = (M_dm_tot / val_m_tot) if val_m_tot > 0 else 0.0
 
+                        
+                            alpha_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio_gal * 100:.1f}%"')
                             with plot_container:
                                 plot_container.clear()
                                 plt.close() 
@@ -2730,24 +2690,30 @@ def create_page():
                             v_bul_ngc = gal_state['v_bul_ngc']
                             v_disk_ngc = gal_state['v_disk_ngc']
                             v_err_ngc = gal_state['v_err_ngc']
-                            r_match = gal_state['r_match']
+                          
                             current_galaxy_name = gal_state['current_galaxy_name']
                             selected_file = gal_state['selected_file']
-                            #print("update_mass_plot: current_galaxy_name =", repr(current_galaxy_name), " galaxy_select.value =", getattr(galaxy_select, "value", None))
                             f = float(alpha_slider.value)
-                            v_baryonic = np.sqrt(np.maximum(0, v_gas_ngc)**2 +
-                            np.maximum(0, v_disk_ngc)**2 +
-                            np.maximum(0, v_bul_ngc)**2)
+                            y_opt = gal_state.get('upsilon', 1.0)
+    
+                          
+                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
+                            v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                             m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
+                            
+                          
+                            rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
+                            v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
+                            
+                         
+                            M_dm_tot = np.nanmax(M_dm_grid_f) if len(M_dm_grid_f) > 0 else 0
+                            m_total_model = m_baryonic + M_dm_grid_f
                             m_total_obs = (v_obs_ngc**2 * r_ngc) / G_grav
-
-                            #rho_s, r_s, _ = get_rhos_rs_from_observed_matching(        r_ngc, v_obs_ngc, v_gas_ngc, v_disk_ngc, v_bul_ngc, r_match=r_match)
-                            #M_dm_grid = M_nfw_enclosed(r_ngc, rho_s=rho_s, r_s=r_s)
-                            rho_s, r_s, M_dm_grid = get_dm_params(f, r_array=r_ngc)
-
-                            m_total_model = m_baryonic + f * M_dm_grid
                             y_min_mass = 0
-                            y_max_mass = max(np.max(m_total_obs), np.max(m_baryonic)*2) * 1.1
+                            
+                            # --- CORREZIONE QUI: uso nanmax per sicurezza ---
+                            y_max_mass = max(np.nanmax(m_total_obs), np.nanmax(m_baryonic)*2) * 1.1 if len(m_total_obs) > 0 else 1e10
+                            
                             x_min_mass = r_ngc.min() * 0.9
                             x_max_mass = r_ngc.max() * 1.1
                             with mass_plot_container:
@@ -2781,7 +2747,7 @@ def create_page():
         'role=status aria-live=polite tabindex=0 aria-label=Total mass of the galaxy (from data), DMyonic mass (computed from data) and simulated mass updated with new dark matter value'
     )
 
-                                    #plot_info_box_compact2({"Visible baryonic mass": f"{np.max(m_baryonic):.2e} M☉",        "Total mass": f"{np.max(m_total_obs):.2e} M☉",        f"Simulated mass DM (α={f:.2f})": f"{np.max(m_total_model):.2e} M☉" })
+
                         def update_morphology_plot():
                                
                                 if not gal_state['DATA_LOADED']:
@@ -2792,33 +2758,37 @@ def create_page():
                                 v_bul_ngc = gal_state['v_bul_ngc']
                                 v_disk_ngc = gal_state['v_disk_ngc']
                                 v_err_ngc = gal_state['v_err_ngc']
-                                r_match = gal_state['r_match']
+                              
                                 current_galaxy_name = gal_state['current_galaxy_name']
                                 selected_file = gal_state['selected_file']
-                                #print("update_morphology_plot: current_galaxy_name =", repr(current_galaxy_name),         " galaxy_select.value =", getattr(galaxy_select, "value", None))
                                 f = float(alpha_slider.value) 
 
                         
-                                v_baryonic = np.sqrt(np.maximum(0, v_gas_ngc)**2 + np.maximum(0, v_disk_ngc)**2 + np.maximum(0, v_bul_ngc)**2)
+                                y_opt = gal_state.get('upsilon', 1.0)
+    
+                              
+                                V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
+                                v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                                 m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
-                                M_vis_tot = np.max(m_baryonic)
-
-                                #rho_s, r_s, _ = get_rhos_rs_from_observed_matching(r_ngc, v_obs_ngc, v_gas_ngc, v_disk_ngc, v_bul_ngc, r_match=r_match)
-                                #M_dm_grid = M_nfw_enclosed(r_ngc, rho_s=rho_s, r_s=r_s)
-                                rho_s, r_s, M_dm_grid = get_dm_params(f, r_array=r_ngc)
-
-                                M_dm_tot = np.max(M_dm_grid) * f
+                                
+                              
+                                rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
+                                v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
+                                
+                            
+                                M_dm_tot = np.nanmax(M_dm_grid_f) if len(M_dm_grid_f) > 0 else 0
+                                m_total_model = m_baryonic + M_dm_grid_f 
 
     
-                                M_bulge = np.max((v_bul_ngc**2 * r_ngc) / G_grav)
-                                M_disk  = np.max((v_disk_ngc**2 * r_ngc) / G_grav)
+                                M_bulge = np.max((v_bul_ngc**2 * r_ngc) / G_grav) if len(r_ngc) > 0 else 0
+                                M_disk  = np.max((v_disk_ngc**2 * r_ngc) / G_grav) if len(r_ngc) > 0 else 0
                                 M_bary_tot = M_disk + M_bulge
 
-
-    
+                                # --- CORREZIONE QUI: val_m_bar previene che R_halo diventi un array causando un crash ---
+                                val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
                                 R_bulge = np.average(r_ngc, weights=np.maximum(0, v_bul_ngc**2)) if np.any(v_bul_ngc > 0) else 1
                                 R_disk  = np.average(r_ngc, weights=np.maximum(0, v_disk_ngc**2)) if np.any(v_disk_ngc > 0) else 5
-                                R_halo  = np.sqrt(M_dm_tot / (M_vis_tot+1e-12)) * np.max(r_ngc) if M_dm_tot > 0 else 0
+                                R_halo  = np.sqrt(M_dm_tot / (val_m_bar+1e-12)) * np.max(r_ngc) if M_dm_tot > 0 else 0
                             
 
                                 with morph_plot_container:
@@ -2838,22 +2808,9 @@ def create_page():
                                           
                                             ax.add_artist(plt.Circle(center, radius, color=color, fill=False, alpha=0.5, linewidth=1, linestyle='--'))
 
-                                        #maxR = max(R_halo, R_disk, R_bulge) * 1.2
-                                        maxR = float(np.max(r_ngc)) * 1.1
+                                        maxR = float(np.max(r_ngc)) * 1.1 if len(r_ngc) > 0 else 10.0
                                         R_halo = min(R_halo, maxR) 
-                                        #if f > 0 and R_halo > 0:
-                                            #draw_gradient_circle(ax, (0,0), min(R_halo, maxR*1.5), 'green', n_steps=15, max_alpha=0.2)
-             
-                                            #ax.plot([], [], 'o', color='green', alpha=0.3, label=f'DM Halo (Sphere)')
-
-         
-                                        #draw_gradient_circle(ax, (0,0), R_disk, 'crimson', n_steps=8, max_alpha=0.6)
-                                        #ax.plot([], [], 'o', color='crimson', alpha=0.5, label='Stellar Disk')
-
-                                      
-                                        #bulge = plt.Circle((0,0), R_bulge, color='gold', alpha=0.9, zorder=10)
-                                        #ax.add_artist(bulge)
-                                        #ax.plot([], [], 'o', color='gold', label='Bulge')
+                                       
 
                                         if f > 0 and R_halo > 0:
                                             halo = plt.Circle((0,0), R_halo, color='limegreen', alpha=0.1,zorder=1,label=f'Halo DM (M={M_dm_tot:.1e}')
@@ -2866,7 +2823,6 @@ def create_page():
                                         bulge = plt.Circle((0,0), R_bulge, color='darkorange', alpha=0.85, linewidth=2,zorder=3,label='Bulge')
                                         ax.add_artist(bulge)
                                        
-                                        #plt.scatter(0, 0, s=5, c='black', marker='o',   linewidths=1, zorder=4, label='Black Hole')
                                         bh = plt.Circle((0,0), 0.5, color='black', zorder=4, label='Black Hole')
                                         ax.add_artist(bh)
 
@@ -2899,39 +2855,40 @@ def create_page():
                             v_bul_ngc = gal_state['v_bul_ngc']
                             v_disk_ngc = gal_state['v_disk_ngc']
                             v_err_ngc = gal_state['v_err_ngc']
-                            r_match = gal_state['r_match']
+                          
                             current_galaxy_name = gal_state['current_galaxy_name']
-                            selected_file = gal_state['selected_file']
-                            chi2_points = gal_state['chi2_points']
-                            manual_points = gal_state['manual_points']
                             galaxy_name = current_galaxy_name
-                            if not galaxy_name:
+                            if not galaxy_name or len(r_ngc) == 0:
                                 return np.inf
-                            if galaxy_name not in unscaled_M_dm_grid_cache:
-                                #rho_s, r_s, _ = get_rhos_rs_from_observed_matching(                                r_ngc, v_obs_ngc, v_gas_ngc, v_disk_ngc, v_bul_ngc, r_match=r_match)
-                                rho_s, r_s, M_dm_grid = get_dm_params(f, r_array=r_ngc)
+                            
+                            # 1. Recupero Upsilon
+                            y_opt = gal_state.get('upsilon', 1.0)
+                            
+                            # 2. Prendo la griglia DM base (con f=1.0) e trovo il massimo
+                            rho_s, r_s, unscaled_M_dm_grid = get_dm_params(1.0, r_array=r_ngc)
+                            max_dm_unscaled = np.nanmax(unscaled_M_dm_grid) if len(unscaled_M_dm_grid) > 0 else 0
+                            if max_dm_unscaled <= 1e-6: 
+                                return np.inf
 
-                                unscaled_M_dm_grid_cache[galaxy_name] = M_nfw_enclosed(r_ngc, rho_s=rho_s, r_s=r_s)
-
-                            unscaled_M_dm_grid = unscaled_M_dm_grid_cache[galaxy_name]
-                            max_dm_unscaled = np.max(unscaled_M_dm_grid)
-                            if max_dm_unscaled <= 1e-6: return np.inf
-
+                            # 3. Calcolo il fattore f corrispondente alla massa richiesta
                             f_val = M_dm_tot / max_dm_unscaled
-                            v_baryonic = np.sqrt(np.maximum(0, v_gas_ngc)**2 +
-                                                np.maximum(0, v_disk_ngc)**2 +
-                                                np.maximum(0, v_bul_ngc)**2)
+                            
+                            # 4. Nuova formula Velocità Barionica con Upsilon
+                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
+                            v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                             m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
+                            
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + f_val * unscaled_M_dm_grid) / r_ngc)
 
+                            # 5. Calcolo del Chi^2
                             mask = np.isfinite(v_obs_ngc) & np.isfinite(v_err_ngc) & (v_err_ngc > 0)
                             vobs_use = v_obs_ngc[mask]
                             verr_use = np.maximum(v_err_ngc[mask], 5.0)
                             vmodel_use = v_total_curve[mask]
                             dof = max(1, len(vobs_use) - 1)
                             chi2_dof = np.sum(((vobs_use - vmodel_use)/verr_use)**2) / dof
-                            #chi2_dof = np.sum(((vobs_use - vmodel_use)/vmodel_use)**2) / dof
-                            return chi2_dof
+                            
+                            return float(chi2_dof)
 
                         def add_chi2_point():
                             r_ngc = gal_state['r_ngc']
@@ -2940,36 +2897,25 @@ def create_page():
                             v_bul_ngc = gal_state['v_bul_ngc']
                             v_disk_ngc = gal_state['v_disk_ngc']
                             v_err_ngc = gal_state['v_err_ngc']
-                            r_match = gal_state['r_match']
-                            current_galaxy_name = gal_state['current_galaxy_name']
-                            selected_file = gal_state['selected_file']
+                          
                             chi2_points = gal_state['chi2_points']
-                            manual_points = gal_state['manual_points']
                           
                             f = float(alpha_slider.value)
-                            m_total_obs = (v_obs_ngc**2 * r_ngc) / G_grav
-                            M_tot_obs_max = np.nanmax(m_total_obs)
-                            M_dm_tot = f * M_tot_obs_max
-                            
-                            rho_s, r_s, M_dm_grid = get_dm_params(1.0, r_array=r_ngc)
-                            max_grid = np.max(M_dm_grid)
-                            f_NFW = M_dm_tot / max_grid if max_grid > 0 else 0
-                            
-                            v_baryonic = np.sqrt(np.maximum(0, v_gas_ngc)**2 + np.maximum(0, v_disk_ngc)**2 + np.maximum(0, v_bul_ngc)**2)
+                            y_opt = gal_state.get('upsilon', 1.0)
+    
+                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
+                            v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                             m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
-                            v_total_curve = np.sqrt(G_grav * (m_baryonic + f_NFW * M_dm_grid) / r_ngc)
-
+                            
+                            rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
+                            v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
+                            
                             mask = np.isfinite(v_obs_ngc) & np.isfinite(v_err_ngc) & (v_err_ngc > 0)
                             vobs_use = v_obs_ngc[mask]
                             verr_use = np.maximum(v_err_ngc[mask], 5.0)
                             vmodel_use = v_total_curve[mask]
 
-                            
-                          
-                        
-
-                            chi2_val = np.sum(((vobs_use - vmodel_use)/verr_use)**2) / max(1, len(vobs_use)-1)
-                            #chi2_val = np.sum(((vobs_use - vmodel_use)/vmodel_use)**2) / max(1, len(vobs_use)-1)
+                            chi2_val = float(np.sum(((vobs_use - vmodel_use)/verr_use)**2) / max(1, len(vobs_use)-1))
                            
                             is_duplicate = any(x == f for x, y in chi2_points)
                             if is_duplicate:
@@ -3000,13 +2946,11 @@ def create_page():
                             plot_chi2_user_curve()
                             update_displays.refresh()
 
-
                         
                         
                     
 
                         def initialize_parabolic_points():
-                         
                             manual_points = gal_state['manual_points']
                             parabolic_state["points"].clear()
                             parabolic_state["history"].clear()
@@ -3024,6 +2968,7 @@ def create_page():
                             if abs(sorted_m[2]-sorted_m[0])/(abs(sorted_m[0])+1e-12)<1e-6:
                                 accessible_notify("Values are too close", type_='warning')
                                 return
+                            
                             manual_points.clear()
                             points = [(m, chi2_function_for_minimization(m)) for m in sorted(masses)]
                         
@@ -3031,22 +2976,17 @@ def create_page():
                             fb_in.value = points[1][1]
                             fc_in.value = points[2][1]
 
-                        
                             formula_pts["fa"], formula_pts["fb"], formula_pts["fc"] = fa_in.value, fb_in.value, fc_in.value
                             formula_pts["a"], formula_pts["b"], formula_pts["c"] = points[0][0], points[1][0], points[2][0]
 
-                        
                             refresh_formula_from_inputs()
                         
-
                             parabolic_state["points"] = points
-                            
                             manual_points.extend(points)
                         
                             xs, ys = zip(*points)
                             coeffs = np.polyfit(xs, ys, 2)
                             
-                           
                             if coeffs[0] > 0:
                                 xmin = -coeffs[1] / (2 * coeffs[0])
                                 ymin = np.polyval(coeffs, xmin)
@@ -3059,10 +2999,8 @@ def create_page():
                                 result_label.set_text("Invalid shape. Try different values!")
                         
                             accessible_notify("Points computed. Check the minimum on the plot.", type_='success')
-
                             update_displays.refresh()
                             plot_chi2_user_curve()
-
                     
 
                         @ui.refreshable
@@ -3080,16 +3018,8 @@ def create_page():
                                     for entry in parabolic_state["history"]:
                                         ui.markdown(entry)
 
-                        
-                        
-                    
-                        
-    
-                        
 
-                        
                         def refresh_chi2_plot():
-                         
                             chi2_points = gal_state['chi2_points']
                             manual_points = gal_state['manual_points']
                             chi2_points.clear()
@@ -3099,7 +3029,6 @@ def create_page():
                             parabolic_state["iteration"] = 0
                             manual_points.clear()
                     
-
                             formula_pts["auto_update"] = False 
                             chi2_state['slider_result']= "---"
                             update_all_plots.refresh()
@@ -3194,8 +3123,8 @@ def create_page():
                                         
                                         <ul>
                                             <li>
-                                                <b>Step 1:</b> Compute the baryonic velocity as the sum of each component from data:<br>
-                                                <span class="math">\( v_{\mathrm{bar}}^2 = v_{\mathrm{gas}}^2 + v_{\mathrm{disk}}^2 + v_{\mathrm{bulge}}^2 \)</span>
+                                                <b>Step 1:</b> Compute the baryonic velocity from data (conserving the gas rotation sign and applying the Mass-to-Light ratio \(\Upsilon\)):<br>
+                                                <span class="math">\( v_{\mathrm{bar}}^2 = v_{\mathrm{gas}}|v_{\mathrm{gas}}| + \Upsilon \left[ v_{\mathrm{disk}}|v_{\mathrm{disk}}| + v_{\mathrm{bulge}}|v_{\mathrm{bulge}}| \right] \)</span>
                                             </li>
                                             
                                             <li style="margin-top: 10px;">
@@ -3335,105 +3264,99 @@ def create_page():
     </style>
 ''')
 
-                   
+                    ui.add_head_html('''
+    <style>
+        .sqrt-box {
+            border-top: 2px solid #e2e8f0; /* Grigio chiaro per risaltare sul fondo scuro */
+            border-left: 2px solid #e2e8f0;
+            padding-left: 8px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+            display: flex;
+            align-items: center; /* Fondamentale per il centraggio verticale */
+            flex-wrap: nowrap;
+        }
+        .compact-select {
+            width: 110px !important; 
+        }
+        .math-text {
+            white-space: nowrap; /* Impedisce che una parentesi vada a capo da sola */
+            display: flex;
+            align-items: center;
+        }
+    </style>
+''')
                     vars_options = ['v_bar', 'v_obs', 'rad', 'g', 'm_tot', 'm_bar', 'v_gas', 'v_disk', 'v_bulge']
                     answer_vb, answer_vo,answer_rad,answer_g,answer_Mtot,answer_Mbar,answer_vgas,answer_vdisk,answer_vbulge = {}, {},{},{},{},{},{},{},{}
                     @ui.refreshable
                     def show_galaxy_pseudocode():
                     
 
-                        with ui.card().classes("items-center justify-center p-6 w-full !bg-gray-900 text-white rounded-xl shadow-xl"):
-                            ui.markdown("Galaxy Mass Exercise: fill the missing parts").classes("text-2xl font-bold text-blue-300 mb-4")
-                          
-                            with ui.row().classes('w-full gap-4 max-w-6xl no-wrap items-start justify-center'):
+                     with ui.card().classes("items-center justify-center p-6 w-full !bg-gray-900 text-white rounded-xl shadow-xl"):
+                        ui.markdown("Galaxy Mass Exercise: fill the missing parts").classes("text-2xl font-bold text-blue-300 mb-4")
+                     
+                        with ui.row().classes('w-full gap-8 max-w-7xl flex-wrap items-start justify-center'):
+                            
+                     
+                            with ui.column().classes('flex-[4] gap-4 min-w-[600px]'):
                                 
-                               
-                                with ui.column().classes('flex-1 gap-4 min-w-[300px]'):
-                                    
-                                 
-                                    ui.label("1) Load galaxy dataset").classes('text-blue-200 font-bold text-lg')
-                                   
-                                    ui.code(f'data = load_data("{galaxy_select.value}")', language='python')
+                                ui.label("1) Load galaxy dataset").classes('text-blue-200 font-bold text-lg')
+                                ui.code(f'data = load_data("{galaxy_select.value}")', language='python')
 
-                                  
-                                    ui.label("2) Compute Baryonic Velocity").classes('text-blue-200 font-bold text-lg')
-                                    with ui.row().classes('items-center gap-1 mt-1 flex-nowrap math-text'):
-                                       
-                                        ui.html('V<span class="math-sub">bar</span> = &radic;')
-                                        
-                                       
-                                        with ui.row().classes('sqrt-content gap-1'):
+                                ui.label("2) Compute Baryonic Velocity").classes('text-blue-200 font-bold text-lg')
+                                with ui.row().classes('items-center no-wrap gap-2'):
+                                    ui.label('Vbar = ').classes('math-text')
+                                    
+                                    with ui.row().classes('sqrt-box items-center no-wrap gap-2'):
+                                        ui.label('[').classes('math-text')
+                                        answer_vgas['el'] = aria_select_input(vars_options, "...").classes('compact-select').props('dense hide-bottom-space')
+                                        ui.label('· |Vgas| + ϒ · (').classes('math-text')
+                                        answer_vdisk['el'] = aria_select_input(vars_options, "...").classes('compact-select').props('dense hide-bottom-space')
+                                        ui.label('· |Vdisk| + ').classes('math-text')
+                                        answer_vbulge['el'] = aria_select_input(vars_options, "...").classes('compact-select').props('dense hide-bottom-space')
+                                        ui.label('· |Vbul|) ]').classes('math-text')
+
+                                ui.label("3) Compute Luminous Mass").classes('text-blue-200 font-bold text-lg')
+                                with ui.row().classes('items-center gap-1 mt-1 math-text'):
+                                    ui.html('M<span class="math-sub">bar</span> = ')
+                                    with ui.column().classes('fraction'):
+                                        with ui.row().classes('numerator items-center gap-1'):
                                             ui.html('(')
-                                            answer_vgas['el'] = aria_select_input(vars_options, "Select variable for gas velocity")
+                                            answer_vb['el'] = aria_select_input(vars_options, "Select variable for baryonic velocity")
+                                            ui.html(')<span class="math-sup">2</span> &middot; ')
+                                            answer_rad['el'] = aria_select_input(vars_options, "Select variable for radius in luminous mass")
+                                        with ui.row().classes('denominator w-full justify-center'):
+                                            answer_g['el'] = aria_select_input(vars_options, "Select variable for gravitational constant")
 
 
-                                            ui.html(')<span class="math-sup">2</span> + (')
-                                            answer_vdisk['el'] = aria_select_input(vars_options, "Select variable for disk velocity")
-                                            ui.html(')<span class="math-sup">2</span> + (')
-                                            answer_vbulge['el'] = aria_select_input(vars_options, "Select variable for bulge velocity")
-                                            ui.html(')<span class="math-sup">2</span>')
+                          
+                            with ui.column().classes('flex-[3] gap-6 min-w-[350px]'):
+                                
+                                ui.label("4) Compute Total Mass").classes('text-blue-200 font-bold text-lg')
+                                with ui.row().classes('items-center gap-1 mt-1 math-text'):
+                                    ui.html('M<span class="math-sub">tot</span> = ')
+                                    with ui.column().classes('fraction'):
+                                        with ui.row().classes('numerator items-center gap-1'):
+                                            ui.html('(')
+                                            answer_vo['el'] = aria_select_input(vars_options, "Select variable for observed velocity")
+                                            ui.html(')<span class="math-sup">2</span> &middot; ')
+                                            answer_rad['el2'] = aria_select_input(vars_options, "Select variable for radius in total mass")
+                                        with ui.row().classes('denominator w-full justify-center'):
+                                            answer_rad['el2'] = aria_select_input(vars_options, "Select variable for radius in total mass")
 
-                                   
-                                    ui.label("3) Compute Luminous Mass").classes('text-blue-200 font-bold text-lg')
-                                    with ui.row().classes('items-center gap-1 mt-1 math-text'):
-                                      
-                                        ui.html('M<span class="math-sub">bar</span> = ')
-                                        
-                                       
-                                        with ui.column().classes('fraction'):
-                                        
-                                            with ui.row().classes('numerator items-center gap-1'):
-                                                ui.html('(')
-                                                answer_vb['el'] = aria_select_input(vars_options, "Select variable for baryonic velocity")
+                                ui.label("5) Compute Dark Matter Mass").classes('text-blue-200 font-bold text-lg')
+                                with ui.row().classes('items-center gap-1 mt-1 math-text'):
+                                    ui.html('M<span class="math-sub">DM</span> = ')
+                                    answer_Mtot['el'] = aria_select_input(vars_options, "Select variable for total mass")
+                                    ui.html('&minus;')
+                                    answer_Mbar['el'] = aria_select_input(vars_options, "Select variable for baryonic mass")
 
-
-                                                ui.html(')<span class="math-sup">2</span> &middot; ')
-                                                answer_rad['el'] = aria_select_input(vars_options, "Select variable for radius in luminous mass")
-                                           
-                                            with ui.row().classes('denominator w-full justify-center'):
-                                                answer_g['el'] = aria_select_input(vars_options, "Select variable for gravitational constant")
-
-                           
-                                with ui.column().classes('flex-1 gap-2'):
-                                    
-                                   
-                                    ui.label("4) Compute Total Mass").classes('text-blue-200 font-bold text-lg')
-                                    with ui.row().classes('items-center gap-1 mt-1 math-text'):
-                                         
-                                        ui.html('M<span class="math-sub">tot</span> = ')
-                                        
-                                     
-                                        with ui.column().classes('fraction'):
-                                          
-                                            with ui.row().classes('numerator items-center gap-1'):
-                                                ui.html('(')
-                                                answer_vo['el'] = aria_select_input(vars_options, "Select variable for observed velocity")
-
-                                                ui.html(')<span class="math-sup">2</span> &middot; ')
-                                               
-                                                answer_rad['el2'] = aria_select_input(vars_options, "Select variable for radius in total mass")
-                                      
-                                            with ui.row().classes('denominator w-full justify-center'):
-                                                answer_rad['el2'] = aria_select_input(vars_options, "Select variable for radius in total mass")
-
-                               
-                                    ui.label("5) Compute Dark Matter Mass").classes('text-blue-200 font-bold text-lg')
-                                    with ui.row().classes('items-center gap-1 mt-1 math-text'):
-                                       
-                                        ui.html('M<span class="math-sub">DM</span> = ')
-                                        answer_Mtot['el'] = aria_select_input(vars_options, "Select variable for total mass")
-
-                                        ui.html('&minus;')
-                                        answer_Mbar['el'] = aria_select_input(vars_options, "Select variable for baryonic mass")
-
-                                 
-                                    ui.label("6) Plot Results").classes('text-blue-200 font-bold text-lg')
-                                    with ui.column().classes('bg-gray-800 p-3 rounded font-mono text-sm text-green-300 w-auto inline-block border border-gray-700'):
-                                        ui.html('plt.plot(R, M<sub>bar</sub>, label="Baryonic mass")')
-                                        ui.html('plt.plot(R, M<sub>tot</sub>, label="Total mass")')
-                                        ui.html('plt.plot(R, V<sub>bar</sub>, label="Baryonic velocity")')
-                                        ui.html('plt.plot(R, V<sub>obs</sub>, label="Observed velocity")')
-
+                                ui.label("6) Plot Results").classes('text-blue-200 font-bold text-lg')
+                                with ui.column().classes('bg-gray-800 p-3 rounded font-mono text-sm text-green-300 w-auto inline-block border border-gray-700'):
+                                    ui.html('plt.plot(R, M<sub>bar</sub>, label="Baryonic mass")')
+                                    ui.html('plt.plot(R, M<sub>tot</sub>, label="Total mass")')
+                                    ui.html('plt.plot(R, V<sub>bar</sub>, label="Baryonic velocity")')
+                                    ui.html('plt.plot(R, V<sub>obs</sub>, label="Observed velocity")')
                     show_galaxy_pseudocode()
                     galaxy_select.on('update:model-value', lambda e: show_galaxy_pseudocode.refresh())
 
@@ -3468,7 +3391,17 @@ def create_page():
                                 v_err_ngc = pd.to_numeric(data_ngc['errV'], errors='coerce').values
 
                                 
-                                v_baryonic = np.sqrt(np.maximum(0, v_gas_ngc)**2 + np.maximum(0, v_disk_ngc)**2 + np.maximum(0, v_bul_ngc)**2)
+                               
+                                gal_name = os.path.splitext(selected_file)[0]
+                                try:
+                                    df_params = pd.read_csv('galaxy_best_parameters.csv')
+                                    row = df_params[df_params['Galaxy'] == gal_name]
+                                    y_opt = float(row.iloc[0]['Upsilon']) if not row.empty else 1.0
+                                except Exception:
+                                    y_opt = 1.0
+
+                                V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
+                                v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                                 m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
                                 m_total    = (v_obs_ngc**2 * r_ngc) / G_grav
                                 with plots_and_image_container:
@@ -3548,8 +3481,17 @@ def create_page():
                         vdisk = pd.to_numeric(data_ngc['Vdisk'], errors='coerce').values
                         vbul = pd.to_numeric(data_ngc['Vbul'], errors='coerce').values
 
-                        vbar = np.sqrt(np.maximum(0, vgas)**2 + np.maximum(0, vdisk)**2 + np.maximum(0, vbul)**2)
-                        mbar = (vbar**2 * r) / G_grav
+                        gal_name = os.path.splitext(selected_file)[0]
+                        try:
+                            df_params = pd.read_csv('galaxy_best_parameters.csv')
+                            row = df_params[df_params['Galaxy'] == gal_name]
+                            y_opt = float(row.iloc[0]['Upsilon']) if not row.empty else 1.0
+                        except Exception:
+                            y_opt = 1.0
+
+                        V_bar_sq = vgas * np.abs(vgas) + y_opt * (vdisk * np.abs(vdisk) + vbul * np.abs(vbul))
+                        v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
+                        m_baryonic = (v_baryonic**2 * r) / G_grav
                         mtot = (vobs**2 * r) / G_grav
 
                         with plots_popup_container:
@@ -3560,14 +3502,14 @@ def create_page():
                                 with ui.pyplot(figsize=(6, 5)):
                                     plt.errorbar(r, vobs, yerr=verr, fmt='o', color='blue', ms=4,
                                                 ecolor='lightblue', capsize=2, label='Observed')
-                                    plt.plot(r, vbar, color='red', lw=2, label='Baryonic')
+                                    plt.plot(r, v_baryonic, color='red', lw=2, label='Baryonic')
                                     plt.xlabel("Radius (kpc)"); plt.ylabel("Velocity (km/s)")
                                     plt.title("Rotation Curve", fontweight='bold')
                                     plt.grid(True); plt.legend()
 
                                 
                                 with ui.pyplot(figsize=(6, 5)):
-                                    plt.plot(r, mbar/1e9, color='red', lw=2, label='Baryonic Mass')
+                                    plt.plot(r, m_baryonic/1e9, color='red', lw=2, label='Baryonic Mass')
                                     plt.plot(r, mtot/1e9, color='blue', lw=2, label='Total Mass')
                                     plt.xlabel("Radius (kpc)"); plt.ylabel(r"Mass ($10^9$ $M_\odot$)")
                                     plt.title("Enclosed Mass", fontweight='bold')
@@ -5299,7 +5241,14 @@ def create_page():
 
 
                           
-                            dm_slider.props(f'label-value="DM / Mₜₒₜ: {f:.2f}"')
+                       
+                            M_DM_current = f * M200
+
+                         
+                            dm_ratio = M_DM_current / M_tot if M_tot > 0 else 0.0
+
+                            dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio * 100:.1f}%"')
+                            #dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio:.2f}"')
                             select_name = cluster_state.get("select", "coma_data.csv")
                             clean_name = select_name.removesuffix('.csv').removesuffix('.txt')
                             cluster_title_label.set_text(f"Cluster Info: {clean_name}")
