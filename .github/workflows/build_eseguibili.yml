@@ -79,12 +79,13 @@ jobs:
         path: artifacts
         merge-multiple: true
 
-    - name: Aggiorna la Release v1.0
+    - name: Sovrascrivi la Release v1.0
       uses: softprops/action-gh-release@v2
       with:
         tag_name: "v1.0"
         name: "Cosmo-Edu Lab v1.0"
+        target_commitish: "main" 
         files: artifacts/*.zip
         make_latest: true
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.ORG_TOKEN }}
