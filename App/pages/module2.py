@@ -52,7 +52,7 @@ import matplotlib.lines as mlines
 import requests
 from dotenv import load_dotenv
 from fastapi import Request
-#from groq import Groq
+
 #from ipywidgets import interact, FloatSlider
 from nicegui import ui, app, run , client
 #from nicegui_toolkit import inject_layout_tool
@@ -2153,16 +2153,23 @@ def create_page():
                                 gal_name = os.path.splitext(filename)[0]
                                
                                 try:
-                                    df_params = pd.read_csv('galaxy_best_parameters.csv')
+                                  
+                                    csv_path = os.path.join(dataset_path, 'galaxy_best_parameters.csv')
+                                    df_params = pd.read_csv(csv_path)
                                     row = df_params[df_params['Galaxy'] == gal_name]
+                                    
                                     if not row.empty:
                                         rho_s = float(row.iloc[0]['rho_s'])
                                         r_s = float(row.iloc[0]['r_s'])
                                         y_opt = float(row.iloc[0]['Upsilon'])
                                     else:
-                                        rho_s, r_s, y_opt = 1e6, 5.0, 1.0 
-                                except Exception:
-                                    rho_s, r_s, y_opt = 1e6, 5.0, 1.0  
+                                        accessible_notify(f"Error: Parameters for {gal_name} not found in CSV!", type_='error')
+                                        gal_state['DATA_LOADED'] = False
+                                        return False 
+                                except Exception as e:
+                                    accessible_notify(f"CSV Read Error: {e}", type_='error')
+                                    gal_state['DATA_LOADED'] = False
+                                    return False
 
                                 gal_state['base_rho_s'] = rho_s
                                 gal_state['base_r_s'] = r_s
@@ -2583,34 +2590,32 @@ def create_page():
                             G_grav = 4.30091e-6
                             
                             y_opt = gal_state.get('upsilon', 1.0)
-    
                             
                             V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
                             v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                             m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
                             
-                           
                             rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
                             
-                            # --- CORREZIONE QUI: estrazione dei singoli valori massimi per il testo ---
+                          
                             M_dm_tot = np.nanmax(M_dm_grid_f) if len(M_dm_grid_f) > 0 else 0
                             m_total_model = m_baryonic + M_dm_grid_f 
                             val_m_tot = np.nanmax(m_total_model) if len(m_total_model) > 0 else 0
                             val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
-                            # -------------------------------------------------------------------------
+                            
+                            dm_ratio_gal = (M_dm_tot / val_m_tot) if val_m_tot > 0 else 0.0
+                            # -----------------------------------------------------
                             
                             clean_name = current_galaxy_name.removesuffix('.txt').removesuffix('.csv')
                             galaxy_title_label.set_text(f"Galaxy Info: {clean_name}")
                            
                             galaxy_info_content.clear()
                             with galaxy_info_content:
-                                # --- CORREZIONE QUI: uso val_m_tot e val_m_bar invece degli array ---
                                 html_info_box(f"""
                                     <ul class="list-none pl-2 space-y-1 text-sm text-gray-800">
                                         <li><b>M<sub>tot</sub>:</b> {format_sci(val_m_tot)} M<sub>☉</sub></li>
-                                        <li><b>M<sub>DM</sub>:</b> {format_sci(M_dm_tot)} M<sub>☉</sub></li>
-                                       
+                                        <li><b>M<sub>DM</sub>:</b> {format_sci(M_dm_tot)} M<sub>☉</sub> <span style="color: #0284c7; font-weight: bold;">({dm_ratio_gal*100:.1f}%)</span></li>
                                         <li><b>M<sub>bar</sub>:</b> {format_sci(val_m_bar)} M<sub>☉</sub></li>
                                        <li><b>v<sub>obs,mean</sub>:</b> {np.nanmean(v_obs_ngc):.1f} km/s</li>
                                         <li><b>v<sub>sim,mean</sub>:</b> {np.nanmean(v_total_curve):.1f} km/s</li>
@@ -2620,14 +2625,12 @@ def create_page():
                             base_name = os.path.splitext(selected_file)[0]
                             found_img = None
 
-                            
                             for ext in exts:
                                 candidate = base_name + ext
                                 if os.path.exists(os.path.join(GALAXY_IMG_PATH, candidate)):
                                     found_img = candidate
                                     break
 
-                           
                             if found_img:
                                 galaxy_img_disp.source = f"/galaxy_img/{found_img}"
                             else:
@@ -2645,11 +2648,9 @@ def create_page():
 
                             ui.run_javascript(f"window.vObsSeries = {v_obs_list}; window.vBarySeries = {v_bary_list}; window.vSimSeries = {v_total_list}; window.vObsMean = {v_obs_mean}; window.vBarMean = {v_bary_mean}; window.vSimMean = {v_total_mean}; window.vDiffSeries = {v_diff_list}; window.vDiffMean = {v_diff_mean};")
 
-                            #alpha_slider.props(f'label-value="DM / Mₜₒₜ: {f:.2f}"')
-                            dm_ratio_gal = (M_dm_tot / val_m_tot) if val_m_tot > 0 else 0.0
-
-                        
+                       
                             alpha_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio_gal * 100:.1f}%"')
+
                             with plot_container:
                                 plot_container.clear()
                                 plt.close() 
@@ -2659,7 +2660,6 @@ def create_page():
                                     plt.plot(r_ngc, v_total_curve, linewidth=3, color='green', label="Simulated velocity" )
                                     plt.errorbar(r_ngc, v_obs_ngc, yerr=v_err_ngc, fmt='o', markersize=4, color='blue', ecolor='gray', capsize=2, label='Observed velocity', zorder=5)
                                     
-                                   
                                     ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
                                     ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
                                     ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
@@ -3394,11 +3394,17 @@ def create_page():
                                
                                 gal_name = os.path.splitext(selected_file)[0]
                                 try:
-                                    df_params = pd.read_csv('galaxy_best_parameters.csv')
+                                    csv_path = os.path.join(dataset_path, 'galaxy_best_parameters.csv')
+                                    df_params = pd.read_csv(csv_path)
                                     row = df_params[df_params['Galaxy'] == gal_name]
-                                    y_opt = float(row.iloc[0]['Upsilon']) if not row.empty else 1.0
-                                except Exception:
-                                    y_opt = 1.0
+                                    if not row.empty:
+                                        y_opt = float(row.iloc[0]['Upsilon'])
+                                    else:
+                                        accessible_notify(f"Error: Parameters for {gal_name} not found in CSV!", type_='error')
+                                        return
+                                except Exception as e:
+                                    accessible_notify(f"CSV Read Error: {e}", type_='error')
+                                    return
 
                                 V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
                                 v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
@@ -3483,11 +3489,17 @@ def create_page():
 
                         gal_name = os.path.splitext(selected_file)[0]
                         try:
-                            df_params = pd.read_csv('galaxy_best_parameters.csv')
+                            csv_path = os.path.join(dataset_path, 'galaxy_best_parameters.csv')
+                            df_params = pd.read_csv(csv_path)
                             row = df_params[df_params['Galaxy'] == gal_name]
-                            y_opt = float(row.iloc[0]['Upsilon']) if not row.empty else 1.0
-                        except Exception:
-                            y_opt = 1.0
+                            if not row.empty:
+                                y_opt = float(row.iloc[0]['Upsilon'])
+                            else:
+                                accessible_notify(f"Error: Parameters for {gal_name} not found in CSV!", type_='error')
+                                return
+                        except Exception as e:
+                            accessible_notify(f"CSV Read Error: {e}", type_='error')
+                            return
 
                         V_bar_sq = vgas * np.abs(vgas) + y_opt * (vdisk * np.abs(vdisk) + vbul * np.abs(vbul))
                         v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
@@ -5258,16 +5270,13 @@ def create_page():
                                 
                                 html_info_box(f"""
                                     <ul class="list-none pl-2 space-y-1 text-sm text-gray-800">
-                                        <li><b>M<sub>tot</sub>:</b> {format_sci(M200)} M<sub>☉</sub></li>
-                                        <li><b>M<sub>DM</sub>:</b> {format_sci(f*M200)} M<sub>☉</sub></li>
-                                       
+                                        <li><b>M<sub>tot</sub>:</b> {format_sci(M_tot)} M<sub>☉</sub></li>
+                                        <li><b>M<sub>DM</sub>:</b> {format_sci(f*M200)} M<sub>☉</sub> <span style="color: #0284c7; font-weight: bold;">({dm_ratio*100:.1f}%)</span></li>
                                         <li><b>M<sub>bar</sub>:</b> {format_sci(M_bar_tot_fixed)} M<sub>☉</sub></li>
                                         <li><b>σ<sub>obs</sub>:</b> {sigma_obs:.1f} km/s</li>
                                         <li><b>σ<sub>sim</sub>:</b> {sigma_dm_val:.1f} km/s</li>
-                                       
                                     </ul>
                                 """)
-                                
                             select_name = cluster_state["select"]
                             img_name = "coma_img.jpg" if select_name.lower() == "coma_data.csv" else os.path.splitext(select_name)[0] + ".jpg"
                             if os.path.exists(os.path.join(CLUSTER_IMG_PATH, img_name)):
@@ -5315,9 +5324,9 @@ def create_page():
                                                 
                                             
                                            
-                                            plt.xlim(0,y_max )
+                                            plt.xlim(0, float(y_max))
                                             #plt.yscale('log')
-                                            plt.ylim(0, x_max + padding )
+                                            plt.ylim(0, float(x_max + padding))
                                             plt.ylabel('Velocity [km/s]',fontsize=10)
                                             plt.xlabel('N° of Galaxies',fontsize=10)
                                             #if cluster_name is not None:
