@@ -88,4 +88,4 @@ jobs:
         files: artifacts/*.zip
         make_latest: true
       env:
-        GITHUB_TOKEN: ${{ secrets.ORG_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.REPOSITORY_TOKEN }}
