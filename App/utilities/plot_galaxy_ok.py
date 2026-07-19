@@ -38,9 +38,11 @@ def fit_galaxy_parameters(r, Vobs, errV, Vgas, Vdisk, Vbul):
     
     rho_s_grid = base_scan * rho_crit_local
     r_s_grid = base_scan
-    y_grid = np.arange(0.01, 2.01, 0.01)
+    y_grid = np.arange(0.01, 5.01, 0.05)
 
   
+    verr_safe = np.maximum(errV, 5.0)
+
     x = r[np.newaxis, :] / r_s_grid[:, np.newaxis] 
     M_dm_rs = 4.0 * np.pi * (r_s_grid[:, np.newaxis]**3) * (np.log(1.0 + x) - x / (1.0 + x))
     
@@ -58,26 +60,24 @@ def fit_galaxy_parameters(r, Vobs, errV, Vgas, Vdisk, Vbul):
         
         V_tot = np.sqrt(np.maximum(V_bar_sq_3d + V_dm_sq_grid, 0))
         
-        # Calcolo Chi^2
-        chi2_grid = np.sum(((Vobs[np.newaxis, np.newaxis, :] - V_tot) / errV[np.newaxis, np.newaxis, :])**2, axis=2) / dof
+        chi2_grid = np.sum(((Vobs[np.newaxis, np.newaxis, :] - V_tot) / verr_safe[np.newaxis, np.newaxis, :])**2, axis=2) / dof
         
         min_idx = np.unravel_index(np.argmin(chi2_grid), chi2_grid.shape)
         if chi2_grid[min_idx] < best_chi2:
             best_chi2 = chi2_grid[min_idx]
             best_p = (rho_s_grid[min_idx[0]], r_s_grid[min_idx[1]], y)
 
-  
     def objective(params):
         rho, rs, y_val = params
         V_bar_sq_opt = Vgas * np.abs(Vgas) + y_val * (Vdisk * np.abs(Vdisk) + Vbul * np.abs(Vbul))
         x_opt = r / rs
         M_dm_opt = 4.0 * np.pi * rho * (rs**3) * (np.log(1.0 + x_opt) - x_opt / (1.0 + x_opt))
         V_tot_opt = np.sqrt(np.maximum(V_bar_sq_opt + (G_grav * M_dm_opt) / r, 0))
-        return np.sum(((Vobs - V_tot_opt) / errV)**2) / dof
+        return np.sum(((Vobs - V_tot_opt) / verr_safe)**2) / dof
 
     res = minimize(objective, best_p, bounds=[(min(rho_s_grid), max(rho_s_grid)), 
                                               (min(r_s_grid), max(r_s_grid)), 
-                                              (0.01, 2.0)])
+                                              (0.01, 5.0)]) 
     
     if res.success and res.fun < best_chi2:
         return res.fun, res.x[0], res.x[1], res.x[2]

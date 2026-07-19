@@ -2236,8 +2236,8 @@ def create_page():
                         pass
                         
                     galaxy_select.on_value_change(lambda e: reload_galaxy(e.value))
-                    alpha_slider.on('update:model-value', update_all_plots.refresh)
-                    
+                    #alpha_slider.on('update:model-value', update_all_plots.refresh)
+                    alpha_slider.on('change', lambda e: update_all_plots.refresh())
                     if default_galaxy:
                         reload_galaxy(default_galaxy)
 
@@ -2417,15 +2417,14 @@ def create_page():
                         
                     
                         with ui.grid(columns=2).classes("w-full gap-4"):
-                          
-                            input_a = ui.number(label='Mass 1 (x₁)', format='%.2e').classes('w-full')
-                            fa_in = ui.number(label="χ²(x₁)", format="%.4f").classes('w-full')
-                           
-                            input_b = ui.number(label='Mass 2 (x₂)', format='%.2e').classes('w-full')
-                            fb_in = ui.number(label="χ²(x₂)", format="%.4f").classes('w-full')
-                          
-                            input_c = ui.number(label='Mass 3 (x₃)', format='%.2e').classes('w-full')
-                            fc_in = ui.number(label="χ²(x₃)", format="%.4f").classes('w-full')
+                            input_a = ui.number(label='Fraction 1 (0 to 1)', format='%.2f').classes('w-full')
+                            fa_in = ui.number(label="χ²(x₁)", format="%.2f").classes('w-full')
+                            
+                            input_b = ui.number(label='Fraction 2 (0 to 1)', format='%.2f').classes('w-full')
+                            fb_in = ui.number(label="χ²(x₂)", format="%.2f").classes('w-full')
+                            
+                            input_c = ui.number(label='Fraction 3 (0 to 1)', format='%.2f').classes('w-full')
+                            fc_in = ui.number(label="χ²(x₃)", format="%.2f").classes('w-full')
 
                      
                         for el in [input_a, input_b, input_c, fa_in, fb_in, fc_in]:
@@ -2848,7 +2847,7 @@ def create_page():
 
                     
                         
-                        def chi2_function_for_minimization(M_dm_tot):
+                        def chi2_function_for_minimization(target_fraction):
                             r_ngc = gal_state['r_ngc']
                             v_obs_ngc = gal_state['v_obs_ngc']
                             v_gas_ngc = gal_state['v_gas_ngc']
@@ -2861,31 +2860,30 @@ def create_page():
                             if not galaxy_name or len(r_ngc) == 0:
                                 return np.inf
                             
-                            # 1. Recupero Upsilon
                             y_opt = gal_state.get('upsilon', 1.0)
                             
-                            # 2. Prendo la griglia DM base (con f=1.0) e trovo il massimo
+                           
                             rho_s, r_s, unscaled_M_dm_grid = get_dm_params(1.0, r_array=r_ngc)
                             max_dm_unscaled = np.nanmax(unscaled_M_dm_grid) if len(unscaled_M_dm_grid) > 0 else 0
-                            if max_dm_unscaled <= 1e-6: 
-                                return np.inf
-
-                            # 3. Calcolo il fattore f corrispondente alla massa richiesta
-                            f_val = M_dm_tot / max_dm_unscaled
                             
-                            # 4. Nuova formula Velocità Barionica con Upsilon
                             V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_opt * (v_disk_ngc * np.abs(v_disk_ngc) + v_bul_ngc * np.abs(v_bul_ngc))
                             v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
                             m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
+                            val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
+                            
+                            if max_dm_unscaled <= 1e-6 or target_fraction >= 1.0 or target_fraction < 0: 
+                                return np.inf
+
+                          
+                            f_val = (target_fraction * val_m_bar) / (max_dm_unscaled * (1.0 - target_fraction))
                             
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + f_val * unscaled_M_dm_grid) / r_ngc)
 
-                            # 5. Calcolo del Chi^2
                             mask = np.isfinite(v_obs_ngc) & np.isfinite(v_err_ngc) & (v_err_ngc > 0)
                             vobs_use = v_obs_ngc[mask]
                             verr_use = np.maximum(v_err_ngc[mask], 5.0)
                             vmodel_use = v_total_curve[mask]
-                            dof = max(1, len(vobs_use) - 1)
+                            dof = max(1, len(vobs_use) - 3) 
                             chi2_dof = np.sum(((vobs_use - vmodel_use)/verr_use)**2) / dof
                             
                             return float(chi2_dof)
@@ -2910,20 +2908,26 @@ def create_page():
                             rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
                             
+                         
+                            M_dm_tot = np.nanmax(M_dm_grid_f) if len(M_dm_grid_f) > 0 else 0
+                            val_m_tot = np.nanmax(m_baryonic + M_dm_grid_f) if len(m_baryonic + M_dm_grid_f) > 0 else 0
+                            dm_fraction = (M_dm_tot / val_m_tot) if val_m_tot > 0 else 0.0
+
                             mask = np.isfinite(v_obs_ngc) & np.isfinite(v_err_ngc) & (v_err_ngc > 0)
                             vobs_use = v_obs_ngc[mask]
                             verr_use = np.maximum(v_err_ngc[mask], 5.0)
                             vmodel_use = v_total_curve[mask]
 
-                            chi2_val = float(np.sum(((vobs_use - vmodel_use)/verr_use)**2) / max(1, len(vobs_use)-1))
+                            chi2_val = float(np.sum(((vobs_use - vmodel_use)/verr_use)**2) / max(1, len(vobs_use) - 3))
                            
-                            is_duplicate = any(x == f for x, y in chi2_points)
+                           
+                            is_duplicate = any(abs(x - dm_fraction) < 1e-4 for x, y in chi2_points)
                             if is_duplicate:
                                 chi2_state['slider_result'] = "Point already added! Move the slider."
                                 plot_chi2_user_curve()
                                 return
                                 
-                            chi2_points.append((f, chi2_val))
+                            chi2_points.append((dm_fraction, chi2_val))
                             
                             if len(chi2_points) > 3: chi2_points.pop(0)
 
@@ -2933,22 +2937,18 @@ def create_page():
                                 if coeffs[0] > 0:
                                     xmin = -coeffs[1] / (2*coeffs[0])  
                                     ymin = np.polyval(coeffs, xmin)
-                                    if xmin < 0 or ymin < 0:
-                                        chi2_state['slider_result'] = "Invalid Result: Ratio and χ² cannot be negative!"
+                                    if xmin < 0 or xmin >= 1.0 or ymin < 0:
+                                        chi2_state['slider_result'] = "Invalid Result: Fraction must be 0 to 1"
                                     else:
-                                        chi2_state['slider_result'] = f"Min Ratio ≈ {xmin:.2f}, χ²_min ≈ {ymin:.2f}"
+                                        chi2_state['slider_result'] = f"Min Fraction ≈ {xmin*100:.1f}%, χ²_min ≈ {ymin:.2f}"
                                 else:
                                     chi2_state['slider_result'] = "Invalid shape. Try different values!"
                             else:
                                 chi2_state['slider_result']= "Add more points to find the minimum."
 
-                            update_all_plots.refresh()
+                            #update_all_plots.refresh()
                             plot_chi2_user_curve()
                             update_displays.refresh()
-
-                        
-                        
-                    
 
                         def initialize_parabolic_points():
                             manual_points = gal_state['manual_points']
@@ -2959,7 +2959,7 @@ def create_page():
 
                             masses = [input_a.value, input_b.value, input_c.value]
                             if not all(isinstance(v, (int,float)) for v in masses):
-                                accessible_notify("Insert 3 values for DM masses", type_='warning')
+                                accessible_notify("Insert 3 valid fractions (0 to 1)", type_='warning')
                                 return
                         
                             chi2_state['slider_result']= "---"
@@ -2991,17 +2991,16 @@ def create_page():
                                 xmin = -coeffs[1] / (2 * coeffs[0])
                                 ymin = np.polyval(coeffs, xmin)
                                 
-                                if xmin < 0 or ymin < 0:
-                                    result_label.set_text("Invalid Result: DM mass and χ² cannot be negative!")
+                                if xmin < 0 or xmin >= 1.0 or ymin < 0:
+                                    result_label.set_text("Invalid Result!")
                                 else:
-                                    result_label.set_text(f"DM min = {xmin:.3e} M☉,  χ² min = {ymin:.4f}")
+                                    result_label.set_text(f"Min Fraction = {xmin*100:.1f}%,  χ² min = {ymin:.2f}")
                             else:
                                 result_label.set_text("Invalid shape. Try different values!")
                         
                             accessible_notify("Points computed. Check the minimum on the plot.", type_='success')
                             update_displays.refresh()
                             plot_chi2_user_curve()
-                    
 
                         @ui.refreshable
                         def update_displays():
@@ -3010,14 +3009,13 @@ def create_page():
                                 if parabolic_state["points"]:
                                     section("Algorithm Points")
                                     for x,y in sorted(parabolic_state["points"], key=lambda p: p[0]):
-                                        ui.label(f"Mass = {x:.3e} M☉, χ²/dof = {y:.4f}")
+                                        ui.label(f"Fraction = {x*100:.1f}%, χ²/dof = {y:.2f}")
                             history_display.clear()
                             with history_display:
                                 if parabolic_state["history"]:
                                     section("History step")
                                     for entry in parabolic_state["history"]:
                                         ui.markdown(entry)
-
 
                         def refresh_chi2_plot():
                             chi2_points = gal_state['chi2_points']
@@ -4521,11 +4519,25 @@ def create_page():
                         cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=70.0)
                         cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(df_coma['modelmag_r'].values, df_coma['extinction_r'].values, cluster_state['z_cluster'])
 
-                        M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                        cluster_state['M200'] = M200
-                        cluster_state['R200'] = R200
-                        cluster_state['c'] = concentration_duffy2008(M200, cluster_state['z_cluster'], h=0.7, relaxed=False)
-
+                        #M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
+                        #cluster_state['M200'] = M200
+                        #cluster_state['R200'] = R200
+                        #cluster_state['c'] = concentration_duffy2008(M200, cluster_state['z_cluster'], h=0.7, relaxed=False)
+                        try:
+                            csv_path = os.path.join(dataset_path, 'cluster_best_parameters.csv')
+                            df_params = pd.read_csv(csv_path)
+                            row = df_params[df_params['Cluster'] == 'coma_data']
+                            if not row.empty:
+                                cluster_state['M200'] = float(row.iloc[0]['M200'])
+                                cluster_state['c'] = float(row.iloc[0]['c'])
+                                cluster_state['R200'] = float(row.iloc[0]['r_s']) * cluster_state['c']
+                            else:
+                                cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
+                                cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
+                        except Exception as e:
+                            print(f"CSV Read Error (Coma): {e}")
+                            cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
+                            cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
                         cluster_state['obs_mean'] = np.mean(cluster_state['observed_vel'])
                         cluster_state['observed_vel_pec'] = cluster_state['observed_vel'] - cluster_state['obs_mean']
 
@@ -4584,12 +4596,27 @@ def create_page():
                             cluster_state['z_cluster']
                         )
 
-                        M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                        cluster_state['M200'] = M200
-                        cluster_state['R200'] = R200
+                        #M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
+                        #cluster_state['M200'] = M200
+                        ##cluster_state['R200'] = R200
 
-                        cluster_state['c'] = concentration_duffy2008(M200, cluster_state['z_cluster'], h=0.7, relaxed=False)
-
+                        #cluster_state['c'] = concentration_duffy2008(M200, cluster_state['z_cluster'], h=0.7, relaxed=False)
+                        gal_name = os.path.splitext(cluster_state['select'])[0]
+                        try:
+                            csv_path = os.path.join(dataset_path, 'cluster_best_parameters.csv')
+                            df_params = pd.read_csv(csv_path)
+                            row = df_params[df_params['Cluster'] == gal_name]
+                            if not row.empty:
+                                cluster_state['M200'] = float(row.iloc[0]['M200'])
+                                cluster_state['c'] = float(row.iloc[0]['c'])
+                                cluster_state['R200'] = float(row.iloc[0]['r_s']) * cluster_state['c']
+                            else:
+                                cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
+                                cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
+                        except Exception as e:
+                            print(f"CSV Read Error ({gal_name}): {e}")
+                            cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
+                            cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
                         cluster_state['obs_mean'] = np.mean(cluster_state['observed_vel'])
                         cluster_state['observed_vel_pec'] = cluster_state['observed_vel'] - cluster_state['obs_mean']
         
@@ -4612,12 +4639,12 @@ def create_page():
                         cluster_state['r_padding'] = 0.1 * (cluster_state['r_max'] - cluster_state['r_min'])
 
                         
-                        cluster_state['dm_slider_min'], cluster_state['dm_slider_max'] = 0.0, 10.0
+                        cluster_state['dm_slider_min'], cluster_state['dm_slider_max'] = 0.0, 0.10
                         f_max = cluster_state['dm_slider_max']
 
                         cluster_state['M_bar_tot'] = np.sum(cluster_state['m_bary_at_gal'])
                         cluster_state['R_cluster_bar'] = r200_from_M200(cluster_state['M_bar_tot'], cluster_state['rho_crit'])
-                        cluster_state['M_tot_max'] = cluster_state['M_bar_tot'] + f_max * M200
+                        cluster_state['M_tot_max'] = cluster_state['M_bar_tot'] + f_max * cluster_state['M200']
                         cluster_state['R200_tot'] = r200_from_M200(cluster_state['M_tot_max'], cluster_state['rho_crit'])
 
                         cluster_state['v_max_expected'] = np.sqrt(G_grav * cluster_state['M_tot_max'] / cluster_state['R200_tot'])
@@ -4711,19 +4738,18 @@ def create_page():
                                 
                                
                                 if all_xs:
-                                    plot_x_max = max(all_xs) * 1.1
-                                    ax.set_xlim(0, plot_x_max if plot_x_max > 0 else x_max_chi_fallback)
+                                    plot_x_min = min(all_xs) * 0.95
+                                    plot_x_max = min(1.0, max(all_xs) * 1.05)
+                                    ax.set_xlim(plot_x_min, plot_x_max)
                                     
-                               
                                     valid_ys = [y for y in all_ys if np.isfinite(y)]
                                     if valid_ys:
                                         plot_y_max = max(max(valid_ys) * 1.1, 1.0)
-                                        
                                         plot_y_min = min(0.0, min(valid_ys) * 1.1) 
                                         ax.set_ylim(plot_y_min, plot_y_max)
                                 else:
-                                  
-                                    ax.set_xlim(0, x_max_chi_fallback)
+                                   
+                                    ax.set_xlim(0.7, 1.0)
                                     ax.set_ylim(0, 10.0)
                                     
                                 ax.set_xlabel(r" $M_{DM}/M_{tot}$")
@@ -4759,53 +4785,46 @@ def create_page():
                         counts_obs = cluster_state['counts_obs']
                         N_obs = cluster_state['N_obs']
 
-                        M_dm_tot = f * M200
                         r_safe = np.maximum(r_proj_kpc, 1)
-                        
-                       
-                        M_dm_at_gal = Mc_nfw_enclosed(r_safe, M200, c, rho_crit)
                         h = 0.7
-                        m_vir_global = np.sum(m_bary_at_gal) + f * M200
-                        m_500_global = 0.7 * m_vir_global
-                        f_gas_global = 0.093 * ((m_500_global / (2e14 / h))**0.21)
-                        m_gas_global = m_500_global * f_gas_global
-
-                        ratio_stars_gas = (np.sum(m_bary_at_gal) + m_gas_global) / np.sum(m_bary_at_gal)
-                        m_bary_tot_at_gal = m_bary_at_gal * ratio_stars_gas
                         
-                        M_bar_tot = np.sum(m_bary_tot_at_gal) 
-                        M_tot = M_bar_tot + f * M200
+                        m_vir_global_fixed = np.sum(m_bary_at_gal) + M200
+                        m_500_global_fixed = 0.7 * m_vir_global_fixed
+                        f_gas_global_fixed = 0.093 * ((m_500_global_fixed / (2e14 / h))**0.21)
+                        m_gas_global_fixed = m_500_global_fixed * f_gas_global_fixed
+
+                        ratio_stars_gas_fixed = (np.sum(m_bary_at_gal) + m_gas_global_fixed) / np.sum(m_bary_at_gal)
+                        m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
+                        
+                        M_bar_tot_fixed = np.sum(m_bary_tot_at_gal_fixed) 
+                        M_tot = M_bar_tot_fixed + f * M200
                         R_cluster = r200_from_M200(M_tot, rho_crit)
                         v_center_tot = np.sqrt(np.maximum(0.0, G_grav * M_tot / R_cluster))
 
                         sigma_fit = np.std(observed_vel)
-                        rng = np.random.default_rng(seed=42)
-                        v_dm = rng.normal(loc=v_center_tot, scale=sigma_fit, size=len(r_proj_kpc))
                         v_mean_obs = np.mean(observed_vel)
-                        sigma_sim = v_center_tot
-                        
-                        #counts_model, _ = np.histogram(v_dm, bins=bins)
-                        #if counts_model.sum() > 0:
-                        #    counts_model = counts_model / counts_model.sum() * N_obs
-                       
                         
                        
                         counts_model = N_obs * (norm.cdf(bins[1:], loc=v_center_tot, scale=sigma_fit) -  norm.cdf(bins[:-1], loc=v_center_tot, scale=sigma_fit))
-                        #counts_model = N_obs * (norm.cdf(bins[1:], loc=v_mean_obs, scale=sigma_sim) -        norm.cdf(bins[:-1], loc=v_mean_obs, scale=sigma_sim))
-                    
-
-                        #chi2_hist = np.sum(((np.log1p(counts_obs) - np.log1p(counts_model))**2))
+                        
+                        dof = max(1, len(counts_obs) - 1)
                         chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
-                        #chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0)**2)
-                        chi2_val = chi2_hist / max(1, len(counts_obs))
+                        chi2_val = float(chi2_hist / dof)
 
-                        is_duplicate = any(x == f for x, y in cluster_state['chi2_points'])
+                    
+                        K_val = (3.0 / (4.0 * np.pi * 200.0 * rho_crit))**(1.0/3.0)
+                        M_tot_overlap = (K_val * (v_mean_obs**2) / G_grav)**1.5
+                        f_overlap = max(1.0, (M_tot_overlap - M_bar_tot_fixed) / M200)
+                        f_eff = f / f_overlap
+                        dm_fraction = (f_eff * M200) / (M_bar_tot_fixed + f_eff * M200) if (M_bar_tot_fixed + f_eff * M200) > 0 else 0.0
+
+                        is_duplicate = any(abs(x - dm_fraction) < 1e-4 for x, y in cluster_state['chi2_points'])
                         if is_duplicate:
-                            cluster_state['chi2_slider_result'] = "Point already added! Move the slider."
+                            cluster_state['chi2_slider_result'] = "Point already added!"
                             plot_cluster_chi2_curve()
                             return  
                             
-                        cluster_state['chi2_points'].append((f, chi2_val))
+                        cluster_state['chi2_points'].append((dm_fraction, chi2_val))
                         
                         if len(cluster_state['chi2_points']) > 3: cluster_state['chi2_points'].pop(0)
                       
@@ -4821,15 +4840,15 @@ def create_page():
                                 xmin = xmin_scaled * x_scale
                                 ymin = np.polyval(coeffs, xmin_scaled) 
                                 
-                                if xmin < 0 or ymin < 0:
-                                    cluster_state['chi2_slider_result'] = "Invalid Result: Ratio and χ² cannot be negative!"
+                                if xmin < 0 or xmin >= 1.0 or ymin < 0:
+                                    cluster_state['chi2_slider_result'] = "Invalid Result: Fraction must be 0 to 1"
                                 else:
-                                    cluster_state['chi2_slider_result'] = f"Min Ratio ≈ {xmin:.2f}, χ²_min ≈ {ymin:.2f}"
+                                    cluster_state['chi2_slider_result'] = f"Min Fraction ≈ {xmin*100:.1f}%, χ²_min ≈ {ymin:.2f}"
                             else:
                                 cluster_state['chi2_slider_result'] = "Invalid shape. Try different values!"
 
                         plot_cluster_chi2_curve()
-
+                        
                     def refresh_cluster_chi2_plot():
                         cluster_state['chi2_points'].clear()
                         cluster_state['chi2_slider_result'] = "---"
@@ -4839,7 +4858,7 @@ def create_page():
                   
 
                     with ui.column().classes('w-full items-center '):
-                        dm_slider_min, dm_slider_max = 0.0, 60.0
+                        dm_slider_min, dm_slider_max = 0.0, 60
                         ui.label("Move the slider to add dark matter to the simulated velocity distribution in the cluster").props('id=dm_slider_label')
                         dm_slider = aria_slider(min=dm_slider_min, max=dm_slider_max,
                         value=0.0, step=0.01,  aria_label="Dark matter fraction control slider").props('aria-describedby=dm_slider_label label-always debounce=300')
@@ -5016,9 +5035,10 @@ def create_page():
                             df = get_cluster_data_cached(new_value)
                             initialize_cluster_from_df(df)
                             new_max_clu = 10.0
+                        #new_max_clu = 0.99
                         recompute_axis_limits()
                         # cluster_name = new_value
-                    
+                        
                         #dm_slider.value = 0.0
                         sigma_obs = cluster_state['sigma_obs']
                         
@@ -5087,7 +5107,8 @@ def create_page():
                         }
                     
 
-                    dm_slider.on_value_change(lambda: refresh_cluster_plots(full_anim=False))
+                    #dm_slider.on_value_change(lambda: refresh_cluster_plots(full_anim=False))
+                    dm_slider.on('change', lambda e: refresh_cluster_plots(full_anim=False))
                     #dm_slider.on('update:model-value', refresh_cluster_plots.refresh)
                     #dataset_selector.on('update:model-value',  on_dataset_change)
                     dataset_selector.on_value_change(lambda e: on_dataset_change(e.value))
@@ -5119,55 +5140,40 @@ def create_page():
                         padding = cluster_state['padding']
                         y_max = cluster_state['y_max']
                         try:
-        
+                            
                             f = float(dm_slider.value) 
-                
-                           
-                        
                             r_safe = np.maximum(r_proj_kpc, 1) 
-                        
-
                             M_dm_at_gal = Mc_nfw_enclosed(r_safe, M200, c, rho_crit)
                             h = 0.7
                      
-                            m_vir_global = np.sum(m_bary_at_gal) + f * M200
-                            m_500_global = 0.7 * m_vir_global
                             
-                            f_gas_global = 0.093 * ((m_500_global / (2e14 / h))**0.21)
-                            m_gas_global = m_500_global * f_gas_global
-
-                           
-                            ratio_stars_gas = (np.sum(m_bary_at_gal) + m_gas_global) / np.sum(m_bary_at_gal)
-                            m_bary_tot_at_gal = m_bary_at_gal * ratio_stars_gas
-                            
-
-                            M_total_at_gal = np.maximum(m_bary_tot_at_gal + f * M_dm_at_gal, 1e-6)
-                        
-                            sigma_los_loc = np.sqrt(np.maximum(0.0, G_grav * M_total_at_gal / (3.0 * r_safe))) 
-                            sigma_fit = np.std(observed_vel) 
-                            
-                            M_bar_tot = np.sum(m_bary_tot_at_gal) 
-                            M_tot = M_bar_tot + f * M200
-                            R_cluster = r200_from_M200(M_tot, rho_crit)
-                            v_center_tot = np.sqrt(np.maximum(0.0, G_grav * M_tot / R_cluster))
-                        
-                            
-                            
-                            m_vir_global_fixed = np.sum(m_bary_at_gal)
+                            m_vir_global_fixed = np.sum(m_bary_at_gal) + M200
                             m_500_global_fixed = 0.7 * m_vir_global_fixed
                             f_gas_global_fixed = 0.093 * ((m_500_global_fixed / (2e14 / h))**0.21)
                             m_gas_global_fixed = m_500_global_fixed * f_gas_global_fixed
                             
                             ratio_stars_gas_fixed = (np.sum(m_bary_at_gal) + m_gas_global_fixed) / np.sum(m_bary_at_gal)
                             m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
-                            
                             M_bar_tot_fixed = np.sum(m_bary_tot_at_gal_fixed)
+                            
+                            M_tot = M_bar_tot_fixed + f * M200
+                            R_cluster = r200_from_M200(M_tot, rho_crit)
                             R_cluster_bar_fixed = r200_from_M200(M_bar_tot_fixed, rho_crit)
+                            
+                            M_total_at_gal = np.maximum(m_bary_tot_at_gal_fixed + f * M_dm_at_gal, 1e-6)
+                            
+                            
+                            sigma_los_loc = np.sqrt(np.maximum(0.0, G_grav * M_total_at_gal / (3.0 * r_safe))) 
                             sigma_bar = np.sqrt(np.maximum(0.0, G_grav * m_bary_tot_at_gal_fixed / (3.0 * r_safe))) 
+                            
+                            sigma_fit = np.std(observed_vel) 
+                            v_center_tot = np.sqrt(np.maximum(0.0, G_grav * M_tot / R_cluster))
                             v_center_bar = np.sqrt(np.maximum(0.0, G_grav * M_bar_tot_fixed / (R_cluster_bar_fixed + 1e-12)))
 
                             rng = np.random.default_rng(seed=42)
                             v_mean_obs = np.mean(observed_vel)
+                            
+                          
                             v_bar = rng.normal(loc=v_center_bar, scale=sigma_fit, size=len(r_proj_kpc))
                             v_dm  = rng.normal(loc=v_center_tot, scale=sigma_fit, size=len(r_proj_kpc))
                             #v_bar = rng.normal(loc=v_mean_obs, scale=v_center_bar, size=len(r_proj_kpc))
@@ -5235,8 +5241,8 @@ def create_page():
 
                             N_sim = len(v_dm) 
                             N_bar=len(v_bar)
-                            M_dm_mean = np.mean(f * M_dm_at_gal)
-                            dm_fraction = np.mean((f * M_dm_at_gal) / M_total_at_gal)
+                            #M_dm_mean = np.mean(f * M_dm_at_gal)
+                            #dm_fraction = np.mean((f * M_dm_at_gal) / M_total_at_gal)
 
 
 
@@ -5257,8 +5263,19 @@ def create_page():
                             M_DM_current = f * M200
 
                          
-                            dm_ratio = M_DM_current / M_tot if M_tot > 0 else 0.0
+                            #dm_ratio = M_DM_current / M_tot if M_tot > 0 else 0.0
 
+                         
+                          
+                            K_val = (3.0 / (4.0 * np.pi * 200.0 * rho_crit))**(1.0/3.0)
+                            M_tot_overlap = (K_val * (v_mean_obs**2) / G_grav)**1.5
+                            f_overlap = max(1.0, (M_tot_overlap - M_bar_tot_fixed) / M200)
+                            
+                          
+                            f_eff = f / f_overlap
+                            dm_ratio = (f_eff * M200) / (M_bar_tot_fixed + f_eff * M200) if (M_bar_tot_fixed + f_eff * M200) > 0 else 0.0
+
+                          
                             dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio * 100:.1f}%"')
                             #dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio:.2f}"')
                             select_name = cluster_state.get("select", "coma_data.csv")
@@ -5407,18 +5424,20 @@ def create_page():
                                     render_frame(obs_vel_sorted, v_bar_sorted[:limit], [], 
                                                  r_sorted, r_sorted[:limit], [])
                                     await asyncio.sleep(sleep_time)
-
-                          
-                            for i in range(1, n_chunks + 1):
-                                if token != plot_state['id']: return 
-                                limit = i * chunk_size
-                                render_frame(obs_vel_sorted, v_bar_sorted, v_dm_sorted[:limit], 
-                                             r_sorted, r_sorted, r_sorted[:limit])
-                             
-                                pause = sleep_time if full_anim else 0.01 
-                                await asyncio.sleep(pause)
-                        
                             
+                          
+                                for i in range(1, n_chunks + 1):
+                                    if token != plot_state['id']: return 
+                                    limit = i * chunk_size
+                                    render_frame(obs_vel_sorted, v_bar_sorted, v_dm_sorted[:limit], 
+                                                r_sorted, r_sorted, r_sorted[:limit])
+                                
+                                    pause = sleep_time if full_anim else 0.01 
+                                    await asyncio.sleep(pause)
+                        
+                            else:
+                               
+                                render_frame(obs_vel_sorted, v_bar_sorted, v_dm_sorted, r_sorted, r_sorted, r_sorted)
 
                         except Exception:
                            
