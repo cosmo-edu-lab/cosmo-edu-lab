@@ -4289,7 +4289,10 @@ def create_page():
                         
                         r_safe = np.maximum(r_proj_kpc, 1.0)
                         
-                        M_dm_base = Mc_nfw_enclosed(r_safe, M200, c, rho_crit)
+                        #M_dm_base = Mc_nfw_enclosed(r_safe, M200, c, rho_crit)
+                        rho_s = cluster_state['rho_s']
+                        r_s = cluster_state['r_s']
+                        M_dm_base = M_nfw_enclosed(r_safe, rho_s, r_s)
                         M_bary_base = np.maximum(m_bary_at_gal, 1e-6)
                         
                         
@@ -4526,18 +4529,23 @@ def create_page():
                         try:
                             csv_path = os.path.join(dataset_path, 'cluster_best_parameters.csv')
                             df_params = pd.read_csv(csv_path)
-                            row = df_params[df_params['Cluster'] == 'coma_data']
+                            # Usa 'coma_data' in load_coma_dataset, usa gal_name in initialize_cluster_from_df
+                            row = df_params[df_params['Cluster'] == 'coma_data'] 
                             if not row.empty:
                                 cluster_state['M200'] = float(row.iloc[0]['M200'])
                                 cluster_state['c'] = float(row.iloc[0]['c'])
-                                cluster_state['R200'] = float(row.iloc[0]['r_s']) * cluster_state['c']
+                                cluster_state['r_s'] = float(row.iloc[0]['r_s'])
+                                cluster_state['rho_s'] = float(row.iloc[0]['rho_s'])
+                                cluster_state['R200'] = cluster_state['r_s'] * cluster_state['c']
                             else:
                                 cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
                                 cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
+                                cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
                         except Exception as e:
-                            print(f"CSV Read Error (Coma): {e}")
+                            print(f"CSV Read Error: {e}")
                             cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
                             cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
+                            cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
                         cluster_state['obs_mean'] = np.mean(cluster_state['observed_vel'])
                         cluster_state['observed_vel_pec'] = cluster_state['observed_vel'] - cluster_state['obs_mean']
 
@@ -4605,18 +4613,23 @@ def create_page():
                         try:
                             csv_path = os.path.join(dataset_path, 'cluster_best_parameters.csv')
                             df_params = pd.read_csv(csv_path)
-                            row = df_params[df_params['Cluster'] == gal_name]
+                         
+                            row = df_params[df_params['Cluster'] == gal_name] 
                             if not row.empty:
                                 cluster_state['M200'] = float(row.iloc[0]['M200'])
                                 cluster_state['c'] = float(row.iloc[0]['c'])
-                                cluster_state['R200'] = float(row.iloc[0]['r_s']) * cluster_state['c']
+                                cluster_state['r_s'] = float(row.iloc[0]['r_s'])
+                                cluster_state['rho_s'] = float(row.iloc[0]['rho_s'])
+                                cluster_state['R200'] = cluster_state['r_s'] * cluster_state['c']
                             else:
                                 cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
                                 cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
+                                cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
                         except Exception as e:
-                            print(f"CSV Read Error ({gal_name}): {e}")
+                            print(f"CSV Read Error: {e}")
                             cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
                             cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
+                            cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
                         cluster_state['obs_mean'] = np.mean(cluster_state['observed_vel'])
                         cluster_state['observed_vel_pec'] = cluster_state['observed_vel'] - cluster_state['obs_mean']
         
@@ -4706,50 +4719,48 @@ def create_page():
                                     ax.scatter(xs, ys, s=40, c="blue", alpha=0.6, zorder=3, label="Points")
 
                                     if len(chi2_points) == 3:
-                                     
-                                        x_scale = max(xs) if max(xs) > 0 else 1
-                                        xs_scaled = np.array(xs) / x_scale
-                                        coeffs = np.polyfit(xs_scaled, ys, 2)
+                                        coeffs = np.polyfit(xs, ys, 2)
                                         
                                         x_lo, x_hi = min(xs), max(xs)
                                         span = x_hi - x_lo
                                         if span == 0: span = x_hi * 0.1
                                         
-                                     
-                                        x_fit = np.linspace(max(0, x_lo - 0.3*span), x_hi + 0.3*span, 400)
-                                        y_fit = np.polyval(coeffs, x_fit / x_scale)
+                                        x_fit = np.linspace(max(0, x_lo - 0.5*span), x_hi + 0.5*span, 400)
+                                        y_fit = np.polyval(coeffs, x_fit)
                                         
                                         all_xs.extend(x_fit)
                                         all_ys.extend(y_fit)
                                         
-                                        if coeffs[0] > 0: 
-                                            
-                                            xmin_scaled = -coeffs[1] / (2 * coeffs[0])
-                                            xmin = xmin_scaled * x_scale
-                                            ymin = np.polyval(coeffs, xmin_scaled)
+                                        if coeffs[0] > 1e-5: 
+                                            xmin = -coeffs[1] / (2 * coeffs[0])
+                                            ymin = np.polyval(coeffs, xmin)
 
                                             ax.plot(x_fit, y_fit, "g-", lw=2, zorder=2, label="Parabolic Fit")
-                                            ax.scatter([xmin], [ymin], c='red', s=140, marker='*', zorder=4, label="Min")
+                                            
+                                           
+                                            if -0.5 <= xmin <= 2.0:
+                                                ax.scatter([xmin], [ymin], c='red', s=140, marker='*', zorder=4, label="Min")
                                             
                                             all_xs.append(xmin)
                                             all_ys.append(ymin)
                                         else:
-                                            ax.plot(x_fit, y_fit, "r--", lw=2, label="Invalid Fit")
+                                            ax.plot(x_fit, y_fit, "r--", lw=2, label="Invalid Fit ")
                                 
                                
                                 if all_xs:
-                                    plot_x_min = min(all_xs) * 0.95
-                                    plot_x_max = min(1.0, max(all_xs) * 1.05)
-                                    ax.set_xlim(plot_x_min, plot_x_max)
+                                    plot_x_max = max(all_xs) * 1.1
+                                    ax.set_xlim(0, plot_x_max if plot_x_max > 0 else x_max_chi_fallback)
                                     
+                               
                                     valid_ys = [y for y in all_ys if np.isfinite(y)]
                                     if valid_ys:
                                         plot_y_max = max(max(valid_ys) * 1.1, 1.0)
+                                        
                                         plot_y_min = min(0.0, min(valid_ys) * 1.1) 
                                         ax.set_ylim(plot_y_min, plot_y_max)
                                 else:
-                                   
-                                    ax.set_xlim(0.7, 1.0)
+                                  
+                                    ax.set_xlim(0, x_max_chi_fallback)
                                     ax.set_ylim(0, 10.0)
                                     
                                 ax.set_xlabel(r" $M_{DM}/M_{tot}$")
@@ -4775,9 +4786,11 @@ def create_page():
 
                     def add_cluster_chi2_point():
                         f = float(dm_slider.value)
+                        S_max = getattr(dm_slider, 'max', 60.0)
+                    
+                        
+                        
                         observed_vel = cluster_state['observed_vel']
-                        M200 = cluster_state['M200']
-                        c = cluster_state['c']
                         rho_crit = cluster_state['rho_crit']
                         r_proj_kpc = cluster_state['r_proj_kpc']
                         m_bary_at_gal = cluster_state['m_bary_at_gal']
@@ -4786,68 +4799,80 @@ def create_page():
                         N_obs = cluster_state['N_obs']
 
                         r_safe = np.maximum(r_proj_kpc, 1)
-                        h = 0.7
+                        rho_s = cluster_state['rho_s']
+                        r_s = cluster_state['r_s']
+                        M_dm_nfw_arr = M_nfw_enclosed(r_safe, rho_s, r_s)
                         
-                        m_vir_global_fixed = np.sum(m_bary_at_gal) + M200
+                        h = 0.7
+                        m_vir_global_fixed = np.sum(m_bary_at_gal)
                         m_500_global_fixed = 0.7 * m_vir_global_fixed
                         f_gas_global_fixed = 0.093 * ((m_500_global_fixed / (2e14 / h))**0.21)
                         m_gas_global_fixed = m_500_global_fixed * f_gas_global_fixed
-
-                        ratio_stars_gas_fixed = (np.sum(m_bary_at_gal) + m_gas_global_fixed) / np.sum(m_bary_at_gal)
+                        ratio_stars_gas_fixed = (m_vir_global_fixed + m_gas_global_fixed) / m_vir_global_fixed
                         m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
                         
-                        M_bar_tot_fixed = np.sum(m_bary_tot_at_gal_fixed) 
-                        M_tot = M_bar_tot_fixed + f * M200
-                        R_cluster = r200_from_M200(M_tot, rho_crit)
-                        v_center_tot = np.sqrt(np.maximum(0.0, G_grav * M_tot / R_cluster))
+                        M_bar_tot_fixed = np.sum(m_bary_tot_at_gal_fixed)
+                        M_DM_csv_tot = np.max(M_dm_nfw_arr)
+                        M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
+                        true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+                        if cluster_state.get('select', '').lower() == 'coma_data.csv':
+                            max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
+                            progress = float(f / S_max) * max_progress
+                        else:
+                            progress = float(f / S_max)
+                        dm_ratio_display = float(progress * true_dm_ratio)
+                        
+                        v_center_bar = np.sqrt(np.maximum(0.0, G_grav * M_bar_tot_fixed / (r200_from_M200(M_bar_tot_fixed, rho_crit) + 1e-12)))
+                        v_mean_obs = np.mean(observed_vel)
+                        if v_mean_obs > v_center_bar:
+                            v_center_tot = v_center_bar + (v_mean_obs - v_center_bar) * progress
+                        else:
+                            v_center_tot = v_mean_obs
 
                         sigma_fit = np.std(observed_vel)
-                        v_mean_obs = np.mean(observed_vel)
-                        
-                       
-                        counts_model = N_obs * (norm.cdf(bins[1:], loc=v_center_tot, scale=sigma_fit) -  norm.cdf(bins[:-1], loc=v_center_tot, scale=sigma_fit))
-                        
-                        dof = max(1, len(counts_obs) - 1)
+                        counts_model = N_obs * (norm.cdf(bins[1:], loc=v_center_tot, scale=sigma_fit) - norm.cdf(bins[:-1], loc=v_center_tot, scale=sigma_fit))
+
                         chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
-                        chi2_val = float(chi2_hist / dof)
+                        chi2_val = chi2_hist / max(1, len(counts_obs))
 
-                    
-                        K_val = (3.0 / (4.0 * np.pi * 200.0 * rho_crit))**(1.0/3.0)
-                        M_tot_overlap = (K_val * (v_mean_obs**2) / G_grav)**1.5
-                        f_overlap = max(1.0, (M_tot_overlap - M_bar_tot_fixed) / M200)
-                        f_eff = f / f_overlap
-                        dm_fraction = (f_eff * M200) / (M_bar_tot_fixed + f_eff * M200) if (M_bar_tot_fixed + f_eff * M200) > 0 else 0.0
-
-                        is_duplicate = any(abs(x - dm_fraction) < 1e-4 for x, y in cluster_state['chi2_points'])
+                        is_duplicate = any(abs(x - dm_ratio_display) < 1e-4 for x, y in cluster_state['chi2_points'])
                         if is_duplicate:
-                            cluster_state['chi2_slider_result'] = "Point already added!"
+                            cluster_state['chi2_slider_result'] = "Point already added! Move the slider."
                             plot_cluster_chi2_curve()
                             return  
                             
-                        cluster_state['chi2_points'].append((dm_fraction, chi2_val))
+                        cluster_state['chi2_points'].append((dm_ratio_display, chi2_val))
                         
                         if len(cluster_state['chi2_points']) > 3: cluster_state['chi2_points'].pop(0)
                       
                         if len(cluster_state['chi2_points']) == 3:
                             xs, ys = zip(*cluster_state['chi2_points'])
+                            coeffs = np.polyfit(xs, ys, 2)
                             
-                            x_scale = max(xs) if max(xs) > 0 else 1
-                            xs_scaled = np.array(xs) / x_scale
-                            coeffs = np.polyfit(xs_scaled, ys, 2)
-                            
-                            if coeffs[0] > 0:
-                                xmin_scaled = -coeffs[1] / (2 * coeffs[0])
-                                xmin = xmin_scaled * x_scale
-                                ymin = np.polyval(coeffs, xmin_scaled) 
+                        
+                            if coeffs[0] > 1e-5:
+                                xmin = -coeffs[1] / (2 * coeffs[0])
+                                ymin = np.polyval(coeffs, xmin) 
                                 
-                                if xmin < 0 or xmin >= 1.0 or ymin < 0:
-                                    cluster_state['chi2_slider_result'] = "Invalid Result: Fraction must be 0 to 1"
+                              
+                                #ymin_display = max(0.0, ymin)
+                             
+                                if xmin < 0:
+                                    cluster_state['chi2_slider_result'] = "Invalid Result: Ratio cannot be negative!"
+                                elif xmin >= 1.0:
+                                    cluster_state['chi2_slider_result'] = "Invalid Result: Ratio cannot exceed 100%!"
+                                elif ymin < 0:
+                                  
+                                    cluster_state['chi2_slider_result'] = f"Invalid Fit: χ² min < 0 (≈ {ymin:.2f})"
                                 else:
-                                    cluster_state['chi2_slider_result'] = f"Min Fraction ≈ {xmin*100:.1f}%, χ²_min ≈ {ymin:.2f}"
-                            else:
-                                cluster_state['chi2_slider_result'] = "Invalid shape. Try different values!"
+                                    cluster_state['chi2_slider_result'] = f"Best Fit: DM/Tot ≈ {xmin*100:.1f}%, χ²_min ≈ {ymin:.2f}"
+                            else:    
+                               
+                                cluster_state['chi2_slider_result'] = "Invalid shape. Select 3 points that surrond the minimum!"
 
                         plot_cluster_chi2_curve()
+
+                    
                         
                     def refresh_cluster_chi2_plot():
                         cluster_state['chi2_points'].clear()
@@ -5140,46 +5165,61 @@ def create_page():
                         padding = cluster_state['padding']
                         y_max = cluster_state['y_max']
                         try:
-                            
+        
                             f = float(dm_slider.value) 
-                            r_safe = np.maximum(r_proj_kpc, 1) 
-                            M_dm_at_gal = Mc_nfw_enclosed(r_safe, M200, c, rho_crit)
-                            h = 0.7
-                     
+                            S_max = getattr(dm_slider, 'max', 60.0)
+                            #progress = float(np.clip(f / S_max, 0.0, 1.0))
                             
-                            m_vir_global_fixed = np.sum(m_bary_at_gal) + M200
+                            
+                            r_safe = np.maximum(r_proj_kpc, 1) 
+                            rho_s = cluster_state['rho_s']
+                            r_s = cluster_state['r_s']
+                            M_dm_at_gal = M_nfw_enclosed(r_safe, rho_s, r_s)
+
+                            h = 0.7
+                            m_vir_global_fixed = np.sum(m_bary_at_gal)
                             m_500_global_fixed = 0.7 * m_vir_global_fixed
                             f_gas_global_fixed = 0.093 * ((m_500_global_fixed / (2e14 / h))**0.21)
                             m_gas_global_fixed = m_500_global_fixed * f_gas_global_fixed
+                            ratio_stars_gas_fixed = (m_vir_global_fixed + m_gas_global_fixed) / m_vir_global_fixed
                             
-                            ratio_stars_gas_fixed = (np.sum(m_bary_at_gal) + m_gas_global_fixed) / np.sum(m_bary_at_gal)
                             m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
+                            
+                            # Calcolo proporzione reale
                             M_bar_tot_fixed = np.sum(m_bary_tot_at_gal_fixed)
+                            M_DM_csv_tot = np.max(M_dm_at_gal)
+                            M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
+                            true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+                        
+                            if cluster_state.get('select', '').lower() == 'coma_data.csv':
+                                max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
+                                progress = float(f / S_max) * max_progress
+                            else:
+                                progress = float(f / S_max)
+                            dm_ratio_display = progress * true_dm_ratio
                             
-                            M_tot = M_bar_tot_fixed + f * M200
-                            R_cluster = r200_from_M200(M_tot, rho_crit)
-                            R_cluster_bar_fixed = r200_from_M200(M_bar_tot_fixed, rho_crit)
-                            
-                            M_total_at_gal = np.maximum(m_bary_tot_at_gal_fixed + f * M_dm_at_gal, 1e-6)
-                            
-                            
+                            M_total_at_gal = np.maximum(m_bary_tot_at_gal_fixed + progress * M_dm_at_gal, 1e-6)
+                        
                             sigma_los_loc = np.sqrt(np.maximum(0.0, G_grav * M_total_at_gal / (3.0 * r_safe))) 
-                            sigma_bar = np.sqrt(np.maximum(0.0, G_grav * m_bary_tot_at_gal_fixed / (3.0 * r_safe))) 
-                            
                             sigma_fit = np.std(observed_vel) 
-                            v_center_tot = np.sqrt(np.maximum(0.0, G_grav * M_tot / R_cluster))
-                            v_center_bar = np.sqrt(np.maximum(0.0, G_grav * M_bar_tot_fixed / (R_cluster_bar_fixed + 1e-12)))
-
-                            rng = np.random.default_rng(seed=42)
+                            
+                           
+                            v_center_bar = np.sqrt(np.maximum(0.0, G_grav * M_bar_tot_fixed / (r200_from_M200(M_bar_tot_fixed, rho_crit) + 1e-12)))
                             v_mean_obs = np.mean(observed_vel)
                             
-                          
+                            if v_mean_obs > v_center_bar:
+                                v_center_tot = v_center_bar + (v_mean_obs - v_center_bar) * progress
+                            else:
+                                v_center_tot = v_mean_obs
+
+                            rng = np.random.default_rng(seed=42)
                             v_bar = rng.normal(loc=v_center_bar, scale=sigma_fit, size=len(r_proj_kpc))
                             v_dm  = rng.normal(loc=v_center_tot, scale=sigma_fit, size=len(r_proj_kpc))
-                            #v_bar = rng.normal(loc=v_mean_obs, scale=v_center_bar, size=len(r_proj_kpc))
-                            #v_dm  = rng.normal(loc=v_mean_obs, scale=v_center_tot, size=len(r_proj_kpc))
+                            
+                            sigma_bar = np.sqrt(np.maximum(0.0, G_grav * m_bary_tot_at_gal_fixed / (3.0 * r_safe)))
+                            
                             obs_sub = observed_vel[::max(1, len(observed_vel)//20)]
-                            bar_sub = sigma_bar[::max(1, len(sigma_bar)//20)]
+                            bar_sub = sigma_bar[::max(1, len(sigma_bar)//20)] 
                             sim_sub = sigma_los_loc[::max(1, len(sigma_los_loc)//20)]
 
                             sigma_obs_series = [float(abs(v - obs_mean)) for v in obs_sub if np.isfinite(v)]
@@ -5241,8 +5281,8 @@ def create_page():
 
                             N_sim = len(v_dm) 
                             N_bar=len(v_bar)
-                            #M_dm_mean = np.mean(f * M_dm_at_gal)
-                            #dm_fraction = np.mean((f * M_dm_at_gal) / M_total_at_gal)
+                            M_dm_mean = np.mean(f * M_dm_at_gal)
+                            dm_fraction = np.mean((f * M_dm_at_gal) / M_total_at_gal)
 
 
 
@@ -5250,7 +5290,7 @@ def create_page():
 
 
 
-                            mass_ratio = M_tot / M_bar_tot_fixed
+                            #mass_ratio = M_tot / M_bar_tot_fixed
                             counts_dm, _ = np.histogram(v_dm, bins=bins)
                             counts_dm = counts_dm / counts_dm.sum() * N_obs
                             chi2_scatter = np.sum(((np.log1p(counts_obs) - np.log1p(counts_dm))**2))
@@ -5265,33 +5305,25 @@ def create_page():
                          
                             #dm_ratio = M_DM_current / M_tot if M_tot > 0 else 0.0
 
-                         
-                          
-                            K_val = (3.0 / (4.0 * np.pi * 200.0 * rho_crit))**(1.0/3.0)
-                            M_tot_overlap = (K_val * (v_mean_obs**2) / G_grav)**1.5
-                            f_overlap = max(1.0, (M_tot_overlap - M_bar_tot_fixed) / M200)
+                            # Aggiorna slider ed etichette
+                            dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio_display * 100:.1f}%"')
                             
-                          
-                            f_eff = f / f_overlap
-                            dm_ratio = (f_eff * M200) / (M_bar_tot_fixed + f_eff * M200) if (M_bar_tot_fixed + f_eff * M200) > 0 else 0.0
-
-                          
-                            dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio * 100:.1f}%"')
-                            #dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio:.2f}"')
                             select_name = cluster_state.get("select", "coma_data.csv")
                             clean_name = select_name.removesuffix('.csv').removesuffix('.txt')
                             cluster_title_label.set_text(f"Cluster Info: {clean_name}")
                           
                             cluster_info_content.clear()
                             with cluster_info_content:
+                                displayed_M_tot = M_bar_tot_fixed + progress * M_DM_csv_tot
+                                displayed_M_DM = progress * M_DM_csv_tot
                                 
                                 html_info_box(f"""
                                     <ul class="list-none pl-2 space-y-1 text-sm text-gray-800">
-                                        <li><b>M<sub>tot</sub>:</b> {format_sci(M_tot)} M<sub>☉</sub></li>
-                                        <li><b>M<sub>DM</sub>:</b> {format_sci(f*M200)} M<sub>☉</sub> <span style="color: #0284c7; font-weight: bold;">({dm_ratio*100:.1f}%)</span></li>
+                                        <li><b>M<sub>tot</sub>:</b> {format_sci(displayed_M_tot)} M<sub>☉</sub></li>
+                                        <li><b>M<sub>DM</sub>:</b> {format_sci(displayed_M_DM)} M<sub>☉</sub> <span style="color: #0284c7; font-weight: bold;">({dm_ratio_display*100:.1f}%)</span></li>
                                         <li><b>M<sub>bar</sub>:</b> {format_sci(M_bar_tot_fixed)} M<sub>☉</sub></li>
                                         <li><b>σ<sub>obs</sub>:</b> {sigma_obs:.1f} km/s</li>
-                                        <li><b>σ<sub>sim</sub>:</b> {sigma_dm_val:.1f} km/s</li>
+                                        <li><b>σ<sub>sim</sub>:</b> {sigma_los_loc.mean():.1f} km/s</li>
                                     </ul>
                                 """)
                             select_name = cluster_state["select"]
