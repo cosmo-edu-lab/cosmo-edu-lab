@@ -39,8 +39,17 @@ def r200_from_M200(M200, rho_crit_local):
 def delta_c_of_c(c):
     return (200.0 / 3.0) * c**3 / (np.log(1.0 + c) - c / (1.0 + c))
 
-def concentration_duffy2008(M200_msun, z):
+def concentration_duffy2008bis(M200_msun, z):
     return 5.71 * (M200_msun / (2e12 / 0.7))**(-0.084) * (1 + z)**(-0.47)
+def concentration_duffy2008(M200_msun, z):
+   
+    M_safe = min(M200_msun, 5e15)
+    
+  
+    c = 5.71 * (M_safe / (2e12 / 0.7))**(-0.084) * (1 + z)**(-0.47)
+    
+   
+    return max(c, 3.5)
 
 def rho_s_from_M200_and_c(M200, c, rho_crit_local):
     r200 = r200_from_M200(M200, rho_crit_local)
@@ -49,14 +58,13 @@ def rho_s_from_M200_and_c(M200, c, rho_crit_local):
 
 def estimate_M200_R200_from_sigma(sigma_obs, rho_crit_local):
     if sigma_obs <= 0: return 1e14, 1000.0
-    def func(R200):
-        M200 = (4.0/3.0) * np.pi * 200.0 * rho_crit_local * R200**3
-        return np.sqrt(max(0.0, G_grav * M200 / (3.0 * R200))) - sigma_obs
-    try:
-        R200 = brentq(func, 10.0, 10000.0)
-    except ValueError:
-        R200 = 2000.0
+    
+   
+    R200 = np.sqrt((9.0 * sigma_obs**2) / (4.0 * np.pi * G_grav * 200.0 * rho_crit_local))
+    
+  
     M200 = (4.0/3.0) * np.pi * 200.0 * rho_crit_local * R200**3
+    
     return M200, R200
 
 
@@ -150,7 +158,7 @@ def run_cluster_analysis():
                 
             M_tot_r = (3.0 * sigma_global**2 * r_sorted) / G_grav
             m_500_r = 0.7 * M_tot_r
-            f_gas_r = 0.093 * ((m_500_r / (2e14 / 0.7))**0.21)
+            f_gas_r = 0.093 * ((m_500_r / 2e14)**0.21)
             m_gas_r = m_500_r * f_gas_r
             M_baryonic_r = M_lum_r + m_gas_r
             
@@ -220,7 +228,7 @@ def run_cluster_analysis():
             
       
             v_dm  = rng.normal(loc=v_mean_obs, scale=sigma_tot_nfw_local, size=len(r_sorted))
-
+            M_DM_plot = np.maximum(0.0, M_tot_r - M_baryonic_r)
             fig, axs = plt.subplots(2, 2, figsize=(16, 12))
             fig.suptitle(f"Cluster Analysis: {cluster_name}", fontsize=18, fontweight='bold')
             
@@ -253,7 +261,8 @@ def run_cluster_analysis():
             
           
             mask_lum = M_baryonic_r > 0
-            axs[1,0].plot(r_sorted[mask_lum], M_baryonic_r[mask_lum], 'r-', lw=2, label='Luminous Mass')
+            axs[1,0].plot(r_sorted[mask_lum], M_baryonic_r[mask_lum], 'r-', lw=2, label='Baryonic Mass')
+            axs[1,0].plot(r_sorted, M_DM_plot, 'g-', lw=2, label='Dark Matter Mass')
             axs[1,0].plot(r_sorted, M_tot_r, 'b-', lw=2, label='Total Mass')
             axs[1,0].set_title('Mass Profile', fontsize=14, fontweight='bold')
             axs[1,0].set_xlabel('Radius (kpc)')
@@ -265,7 +274,8 @@ def run_cluster_analysis():
             
           
             Vol = (4.0/3.0) * np.pi * r_sorted**3
-            axs[1,1].plot(r_sorted, M_baryonic_r/Vol, 'r-', lw=2, label='Luminous Density')
+            axs[1,1].plot(r_sorted, M_baryonic_r/Vol, 'r-', lw=2, label='Baryonic Density')
+            axs[1,1].plot(r_sorted, M_DM_plot/Vol, 'g-', lw=2, label='Dark Matter Density')
             axs[1,1].plot(r_sorted, M_tot_r/Vol, 'b-', lw=2, label='Total Density')
             axs[1,1].set_title('Density Profile', fontsize=14, fontweight='bold')
             axs[1,1].set_xlabel('Radius (kpc)')
