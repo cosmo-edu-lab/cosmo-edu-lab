@@ -252,7 +252,16 @@ def create_page():
         M_pivot = 1e15 / h
         log10_c = A + B * np.log10(M200_msun / M_pivot) + C * np.log10(1.0 + z)
         return 10.0**log10_c
-    def concentration_duffy2008(M200_msun, z, h=0.7, relaxed=False):
+    def concentration_duffy2008(M200_msun, z):
+   
+        M_safe = min(M200_msun, 5e15)
+        
+    
+        c = 5.71 * (M_safe / (2e12 / 0.7))**(-0.084) * (1 + z)**(-0.47)
+        
+    
+        return max(c, 3.5)
+    def concentration_duffy2008bis(M200_msun, z, h=0.7, relaxed=False):
 
         M_pivot = 2e12 / h  # Msun
 
@@ -264,7 +273,7 @@ def create_page():
         return A * (M200_msun / M_pivot)**B * (1 + z)**C
 
 
-    def estimate_M200_R200_from_sigma(sigma_obs, rho_crit_local, G=G_grav,
+    def estimate_M200_R200_from_sigma2(sigma_obs, rho_crit_local, G=G_grav,
                                     R200_min=100.0, R200_max=5000.0,
                                     verbose=False):
         """
@@ -367,7 +376,27 @@ def create_page():
         M200 = 1e15 * (sigma_safe / 1082.0)**3
         R200 = r200_from_M200(M200, rho_crit_local)
         return M200, R200
+    def estimate_M200_R200_from_sigma(sigma_obs, rho_crit_local, G=G_grav,
+                                    R200_min=100.0, R200_max=5000.0,
+                                    verbose=False):
+        """
+        - sigma_obs in km/s
+        - rho_crit_local in Msun/kpc^3
+        - G in (kpc * (km/s)^2) / Msun 
+        Output (M200 [Msun], R200 [kpc]).
+        """
+        if sigma_obs is None or not np.isfinite(sigma_obs):
+            raise RuntimeError("sigma_obs non finito")
+        if sigma_obs <= 0.0:
+            return 1e14, 1000.0
 
+       
+        R200 = np.sqrt((9.0 * sigma_obs**2) / (4.0 * np.pi * G * 200.0 * rho_crit_local))
+        
+    
+        M200 = (4.0/3.0) * np.pi * 200.0 * rho_crit_local * R200**3
+        
+        return M200, R200
 
     def stellar_mass_from_r_mag(app_mag_r, extinction_r, z, M_to_L_ratio=2.0):
     
@@ -4806,7 +4835,7 @@ def create_page():
                         h = 0.7
                         m_vir_global_fixed = np.sum(m_bary_at_gal)
                         m_500_global_fixed = 0.7 * m_vir_global_fixed
-                        f_gas_global_fixed = 0.093 * ((m_500_global_fixed / (2e14 / h))**0.21)
+                        f_gas_global_fixed = 0.093 * ((m_500_global_fixed / 2e14)**0.21)
                         m_gas_global_fixed = m_500_global_fixed * f_gas_global_fixed
                         ratio_stars_gas_fixed = (m_vir_global_fixed + m_gas_global_fixed) / m_vir_global_fixed
                         m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
@@ -5179,7 +5208,7 @@ def create_page():
                             h = 0.7
                             m_vir_global_fixed = np.sum(m_bary_at_gal)
                             m_500_global_fixed = 0.7 * m_vir_global_fixed
-                            f_gas_global_fixed = 0.093 * ((m_500_global_fixed / (2e14 / h))**0.21)
+                            f_gas_global_fixed = 0.093 * ((m_500_global_fixed / 2e14)**0.21)
                             m_gas_global_fixed = m_500_global_fixed * f_gas_global_fixed
                             ratio_stars_gas_fixed = (m_vir_global_fixed + m_gas_global_fixed) / m_vir_global_fixed
                             
@@ -5587,10 +5616,10 @@ def create_page():
                         M_tot_r = (3.0 * sigma_global**2 * R_cum) / G
                         h = 0.7  
                         m_500_r = 0.7 * M_tot_r
-                        f_gas_r = 0.093 * ((m_500_r / (2e14 / h))**0.21)
+                        f_gas_r = 0.093 * ((m_500_r / 2e14)**0.21)
                         m_gas_r = m_500_r * f_gas_r
                         M_baryonic_r = M_lum_r + m_gas_r
-                        # positive floor to avoid zeros
+                      
                         def positive_floor(arr):
                             pos = arr[np.isfinite(arr) & (arr > 0)]
                             if pos.size == 0:
@@ -5600,14 +5629,19 @@ def create_page():
 
                         M_tot_r = positive_floor(M_tot_r)
                         M_baryonic_r = positive_floor(M_baryonic_r)
+                        
+                       
+                        M_DM_r = np.maximum(0.0, M_tot_r - M_baryonic_r)
 
                         rho_lum_cum = M_baryonic_r / ((4.0/3.0) * np.pi * R_cum**3)
                         rho_tot_cum = M_tot_r / ((4.0/3.0) * np.pi * R_cum**3)
+                        rho_DM_cum = M_DM_r / ((4.0/3.0) * np.pi * R_cum**3)
 
                         with cluster_popup_container:
                             with ui.row().classes('w-full justify-center gap-8 flex-wrap'):
                                 with ui.pyplot(figsize=(8, 6)):
                                     plt.plot(R_cum, M_baryonic_r/1e9, label="Luminous Mass", color="red", lw=2)
+                                    plt.plot(R_cum, M_DM_r/1e9, label="Dark Matter Mass", color="green", lw=2)
                                     plt.plot(R_cum, M_tot_r/1e9, label="Total Mass", color="blue", lw=2)
                                     plt.xscale("log"); plt.yscale("log")
                                     plt.xlabel("Radius (kpc)"); plt.ylabel("Mass (10^9 M☉)")
@@ -5617,6 +5651,7 @@ def create_page():
 
                                 with ui.pyplot(figsize=(8, 6)):
                                     plt.plot(R_cum, rho_lum_cum, label="Luminous Density", color="red")
+                                    plt.plot(R_cum, rho_DM_cum, label="Dark Matter Density", color="green")
                                     plt.plot(R_cum, rho_tot_cum, label="Total Density", color="blue")
                                     plt.xscale("log"); plt.yscale("log")
                                     plt.xlabel("Radius (kpc)"); plt.ylabel("Density (M☉/kpc³)")
@@ -6268,7 +6303,7 @@ def create_page():
                                     M_tot_r = (3.0 * sigma_global**2 * R_cum) / G 
                                     h = 0.7  
                                     m_500_r = 0.7 * M_tot_r
-                                    f_gas_r = 0.093 * ((m_500_r / (2e14 / h))**0.21)
+                                    f_gas_r = 0.093 * ((m_500_r / 2e14)**0.21)
                                     m_gas_r = m_500_r * f_gas_r
                                     M_baryonic_r = M_lum_r + m_gas_r
 
@@ -6281,12 +6316,16 @@ def create_page():
 
                                     M_tot_r = positive_floor(M_tot_r)
                                     M_baryonic_r = positive_floor(M_baryonic_r)
+                                    
+                                    
+                                    M_DM_r = np.maximum(0.0, M_tot_r - M_baryonic_r)
 
                                     with ui.column().classes('flex-1 items-center'):  
                                         with ui.pyplot(figsize=(8,6)):
                                     
                                             mask_lum = M_baryonic_r > 0
                                             plt.plot(R_cum[mask_lum], M_baryonic_r[mask_lum], label='Luminous Mass', color='red')
+                                            plt.plot(R_cum, M_DM_r, label='Dark Matter Mass', color='green')
                                             plt.plot(R_cum, M_tot_r, label='Total Mass (Virial)', color='blue')
                                             plt.xscale('log'); plt.yscale('log')
                                             plt.xlabel('Radius (kpc)'); plt.ylabel('Mass ($M_\\odot$)')
@@ -6298,10 +6337,13 @@ def create_page():
                                 
                                         rho_lum_cum = M_baryonic_r / ((4.0/3.0) * np.pi * R_cum**3)
                                         rho_tot_cum = M_tot_r / ((4.0/3.0) * np.pi * R_cum**3)
+                                        rho_DM_cum = M_DM_r / ((4.0/3.0) * np.pi * R_cum**3)
+                                        
                                     with ui.column().classes('flex-1 items-center'):
                                         with ui.pyplot(figsize=(8,6)):
                                         
                                             plt.plot(R_cum, rho_lum_cum, label=' Luminous Density', color='red')
+                                            plt.plot(R_cum, rho_DM_cum, label=' Dark Matter Density', color='green')
                                             plt.plot(R_cum, rho_tot_cum, label=' Total Density', color='blue')
                                             plt.xscale('log'); plt.yscale('log')
                                             plt.xlabel('Radius (kpc)')
