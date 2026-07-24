@@ -4318,12 +4318,17 @@ def create_page():
                         
                         r_safe = np.maximum(r_proj_kpc, 1.0)
                         
-                        #M_dm_base = Mc_nfw_enclosed(r_safe, M200, c, rho_crit)
-                        rho_s = cluster_state['rho_s']
-                        r_s = cluster_state['r_s']
-                        M_dm_base = M_nfw_enclosed(r_safe, rho_s, r_s)
-                        M_bary_base = np.maximum(m_bary_at_gal, 1e-6)
+                        # --- VECCHIO CALCOLO NFW  ---
+                        # rho_s = cluster_state['rho_s']
+                        # r_s = cluster_state['r_s']
+                        # M_dm_base = M_nfw_enclosed(r_safe, rho_s, r_s)
+                        # M_bary_base = np.maximum(m_bary_at_gal, 1e-6)
                         
+                        # --- NUOVO CALCOLO SOTTRAZIONE VIRIALE ---
+                        sigma_obs_global = cluster_state['sigma_obs']
+                        M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
+                        M_bary_base = np.maximum(m_bary_at_gal, 1e-6)
+                        M_dm_base = np.maximum(0.0, M_tot_virial - M_bary_base)
                         
                         dir_x_model = rng.normal(0.0, 1.0, N_gal)
                         dir_y_model = rng.normal(0.0, 1.0, N_gal)
@@ -4828,9 +4833,11 @@ def create_page():
                         N_obs = cluster_state['N_obs']
 
                         r_safe = np.maximum(r_proj_kpc, 1)
-                        rho_s = cluster_state['rho_s']
-                        r_s = cluster_state['r_s']
-                        M_dm_nfw_arr = M_nfw_enclosed(r_safe, rho_s, r_s)
+                        
+                        # --- VECCHIO CALCOLO NFW (COMMENTATO) ---
+                        # rho_s = cluster_state['rho_s']
+                        # r_s = cluster_state['r_s']
+                        # M_dm_nfw_arr = M_nfw_enclosed(r_safe, rho_s, r_s)
                         
                         h = 0.7
                         m_vir_global_fixed = np.sum(m_bary_at_gal)
@@ -4841,7 +4848,18 @@ def create_page():
                         m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
                         
                         M_bar_tot_fixed = np.sum(m_bary_tot_at_gal_fixed)
-                        M_DM_csv_tot = np.max(M_dm_nfw_arr)
+                        
+                        # --- VECCHIO CALCOLO NFW ---
+                        # M_DM_csv_tot = np.max(M_dm_nfw_arr)
+                        # M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
+                        # true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+
+                        # --- NUOVO CALCOLO SOTTRAZIONE VIRIALE ---
+                        sigma_obs_global = cluster_state['sigma_obs']
+                        M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
+                        M_dm_virial_arr = np.maximum(0.0, M_tot_virial - m_bary_tot_at_gal_fixed)
+                        
+                        M_DM_csv_tot = np.max(M_dm_virial_arr)
                         M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
                         true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
                         if cluster_state.get('select', '').lower() == 'coma_data.csv':
@@ -5201,9 +5219,11 @@ def create_page():
                             
                             
                             r_safe = np.maximum(r_proj_kpc, 1) 
-                            rho_s = cluster_state['rho_s']
-                            r_s = cluster_state['r_s']
-                            M_dm_at_gal = M_nfw_enclosed(r_safe, rho_s, r_s)
+                            
+                            # --- VECCHIO CALCOLO NFW (COMMENTATO) ---
+                            # rho_s = cluster_state['rho_s']
+                            # r_s = cluster_state['r_s']
+                            # M_dm_at_gal = M_nfw_enclosed(r_safe, rho_s, r_s)
 
                             h = 0.7
                             m_vir_global_fixed = np.sum(m_bary_at_gal)
@@ -5214,12 +5234,29 @@ def create_page():
                             
                             m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
                             
-                            # Calcolo proporzione reale
+                           
                             M_bar_tot_fixed = np.sum(m_bary_tot_at_gal_fixed)
+                            
+                            # --- VECCHIO CALCOLO NFW  ---
+                            # M_DM_csv_tot = np.max(M_dm_at_gal)
+                            # M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
+                            # true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+
+                            # --- NUOVO CALCOLO SOTTRAZIONE VIRIALE ---
+                            sigma_obs_global = cluster_state['sigma_obs']
+                            M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
+                            M_dm_at_gal = np.maximum(0.0, M_tot_virial - m_bary_tot_at_gal_fixed)
+                            
                             M_DM_csv_tot = np.max(M_dm_at_gal)
                             M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
                             true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
-                        
+
+                            
+                            sigma_obs_global = cluster_state['sigma_obs']
+                            M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
+                            M_dm_at_gal = np.maximum(0.0, M_tot_virial - m_bary_tot_at_gal_fixed)
+                            
+                            
                             if cluster_state.get('select', '').lower() == 'coma_data.csv':
                                 max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
                                 progress = float(f / S_max) * max_progress

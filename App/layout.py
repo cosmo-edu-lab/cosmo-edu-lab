@@ -1438,7 +1438,7 @@ def main_layout(title: str):
         def open_slides_cosmo():
             ui.run_javascript('window.open("/slides/Cosmology_Notes.pdf", "_blank")')
         def open_activities():
-            ui.run_javascript('window.open("/slides/activities.pdf", "_blank")')
+            ui.run_javascript('window.open("/slides/activities2.pdf", "_blank")')
         def open_astronomy():
             ui.run_javascript('window.open("/slides/Astrophysics_Notes.pdf", "_blank")')
         def DM_slides():
