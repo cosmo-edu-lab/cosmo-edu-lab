@@ -52,6 +52,17 @@ ui.add_head_html = safe_add_head
 ui.add_css = safe_add_css
 ui.add_body_html = safe_add_body
 
+_OriginalDialog = ui.dialog
+
+
+class AutoDialog(_OriginalDialog):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+       
+        self.props('seamless persistent')
+
+
+ui.dialog = AutoDialog
 import core
 
 import layout
@@ -73,7 +84,7 @@ app.add_static_files('/cluster_img', os.path.join(BASE_DIR, 'cluster_img'))
 app.add_static_files('/slides', os.path.join(BASE_DIR, 'slides'))
 app.add_static_files('/discovery_images', os.path.join(BASE_DIR, 'discovery_images'))
 app.add_static_files('/cosmic_epochs', os.path.join(BASE_DIR, 'cosmic_epochs'))
-app.add_static_files('/student_files', core.SUBMISSIONS_PATH) # Prende dalla USER_DIR di core.py
+app.add_static_files('/student_files', core.SUBMISSIONS_PATH) 
 app.add_static_files('/static', os.path.join(BASE_DIR, 'static'))
 
 auth.create_auth_routes()  

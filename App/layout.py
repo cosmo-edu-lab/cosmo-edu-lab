@@ -109,6 +109,80 @@ ui.add_head_html("""
 
 }
 </style>""")
+ui.add_head_html("""<script>
+document.addEventListener('mousedown', function(e) {
+    let card = e.target.closest('.q-dialog .q-card');
+    if (!card) return;
+
+    // Blocca il trascinamento se si clicca su elementi interattivi o grafici
+    let isInteractive = e.target.closest('button, a, input, textarea, select, .q-btn, .q-slider, canvas, svg, img');
+    if (isInteractive) return;
+
+    let isDragging = true;
+    let startX = e.clientX;
+    let startY = e.clientY;
+    
+    let style = window.getComputedStyle(card);
+    let matrix = new WebKitCSSMatrix(style.transform);
+    let currentX = matrix.m41;
+    let currentY = matrix.m42;
+
+    function onMouseMove(moveEvent) {
+        if (!isDragging) return;
+        let dx = moveEvent.clientX - startX;
+        let dy = moveEvent.clientY - startY;
+        card.style.transform = `translate(${currentX + dx}px, ${currentY + dy}px)`;
+    }
+
+    function onMouseUp() {
+        isDragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+});
+
+// 2. Prevenire la sovrapposizione all'apertura
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(node) {
+            if (node.classList && node.classList.contains('q-dialog')) {
+                let card = node.querySelector('.q-card');
+                if (card && !card.dataset.offsetSet) {
+                    // Crea uno sfalsamento casuale tra -60 e +60 pixel
+                    let offsetX = Math.floor(Math.random() * 120) - 60;
+                    let offsetY = Math.floor(Math.random() * 120) - 60;
+                    card.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+                    card.dataset.offsetSet = "true";
+                }
+            }
+        });
+    });
+});
+observer.observe(document.body, { childList: true, subtree: true });
+</script>""")
+ui.add_head_html("""<style>
+    /* Applica in automatico queste regole a TUTTE le card dentro i dialoghi */
+    .q-dialog .q-card {
+        resize: both !important;
+        overflow: auto !important;
+        min-width: 250px !important; /* Leggermente ridotto per gli smartphone */
+        min-height: 200px !important;
+        
+        /* ADATTAMENTO MOBILE: Impedisce alla finestra di uscire dallo schermo */
+        max-width: 95vw !important; /* 95% della larghezza dello schermo */
+        max-height: 90vh !important; /* 90% dell'altezza dello schermo */
+    }
+
+    /* Ottimizzazione per dispositivi touch: maniglia di resize più visibile/cliccabile */
+    .q-dialog .q-card::-webkit-resizer {
+        background-color: #3b82f6; /* Colore blu per evidenziare la maniglia */
+        border-radius: 50%;
+    }
+</style>""")
 def title(title: str):
     """Titolo principale (blu scuro, grande, bold)"""
     el= ui.element('h2').classes("title").props('tabindex=0 role=heading aria-level=2')
@@ -249,44 +323,21 @@ global_notification_area = None
 
 
 def accessible_notify(text: str, type_: str = "info", *args, **kwargs):
-    global global_notification_area
-    
+    # Gestione delle conversioni dei nomi dei colori/tipi
     t = kwargs.get('type_', kwargs.get('type', type_))
     color_arg = kwargs.get('color', None)
+    
     if color_arg:
-        if color_arg in ['positive', 'success']: t = 'success'
-        elif color_arg in ['negative', 'error']: t = 'error'
+        if color_arg in ['positive', 'success']: t = 'positive'
+        elif color_arg in ['negative', 'error']: t = 'negative'
         elif color_arg in ['warning']: t = 'warning'
-    
-    target_container = global_notification_area if global_notification_area else ui.context.client.layout
-    
-    if global_notification_area:
-        global_notification_area.style('display: flex; width: 100%;')
-
-    color_classes = {
-        "info": "bg-blue-100 text-blue-900 border border-blue-400",
-        "success": "bg-green-100 text-green-900 border border-green-600",
-        "warning": "bg-yellow-100 text-yellow-950 border border-yellow-500",
-        "error": "bg-red-100 text-red-950 border border-red-600",
-    }.get(t, "bg-blue-100 text-blue-900 border border-blue-400")
-
-    with target_container:
-        # 1. Creiamo la card e la salviamo in una variabile specifica
-        noti_card = ui.card().classes(f"p-2 rounded-lg shadow-sm w-full text-center my-1 text-lg font-bold {color_classes}").props(
-            f'role={"alert" if t in ["error","warning"] else "status"} aria-live=polite tabindex=0'
-        )
-        with noti_card: 
-            ui.label(text)
-
-    # 2. Funzione mirata che distrugge SOLO questa specifica card
-    def remove_noti():
-        try:
-            noti_card.delete()
-        except Exception:
-            pass
-
-    # 3. Timer impostato a 3.5 secondi
-    ui.timer(3.5, remove_noti, once=True)
+        else: t = 'info'
+    else:
+        if t == 'error': t = 'negative'
+        elif t == 'success': t = 'positive'
+        
+    # Usa il sistema nativo in alto, con il bottone di chiusura e il timeout di 3.5s!
+    ui.notify(text, type=t, position='top', close_button=True, multi_line=True, timeout=5.0)
 def enlargeable_plot(plot_func, width_percent=100):
     """
     Crea un container cliccabile. Quando cliccato, apre il grafico in un dialog grande.
@@ -784,8 +835,7 @@ def set_background():
             outline: 4px solid #00d4ff;
             border-radius: 8px;
             
-            /* Sfondo Scuro di Default */
-            background-color: var(--q-dark-page, #0f172a); 
+            
         }
 
         /* 3. ECCEZIONI PER I POP-UP BIANCHI */
