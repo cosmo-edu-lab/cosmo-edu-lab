@@ -978,6 +978,7 @@ def create_page():
                         html_info_box(r"""
         <h3>Kepler's Laws Exploration</h3>
         <p>Explore the orbital characteristics of planets in our solar system using Kepler's Laws.</p>
+        <p>Observe the model of the Solar System, you can rotate and zoom. The colorbar represents the orbital velocity: planets near the Sun have higher velocities than those farther away.</p>
         <p>Use the dropdown menu to select a planet and see how its orbital parameters compare to the theoretical Keplerian predictions.</p>
         <ul>
             <li><b>Keplerian orbital velocity curve Plot:</b> Shows the orbital velocity vs semi-major axis for each planet, illustrating Kepler's Second Law.</li>
@@ -2481,7 +2482,7 @@ def create_page():
 
                     ui.label("Move the slider to add the dark matter to the simulated velocity curve").props('id=alpha_slider_label aria-live=polite tabindex=0')
                     alpha_slider = aria_slider(min=0.0, max=2.0, value=0.0, step=0.01,
-                                            aria_label="Dark matter fraction control slider").props('aria-describedby=alpha_slider_label label-always debounce=300')
+                                            aria_label="Dark matter fraction control slider").props('aria-describedby=alpha_slider_label label-always')
                     alpha_slider.bind_value(dialog_dm_slider, 'value')
                     f = float(alpha_slider.value)
                     
@@ -5273,7 +5274,7 @@ def create_page():
                         dm_slider_min, dm_slider_max = 0.0, 60
                         ui.label("Move the slider to add dark matter to the simulated velocity distribution in the cluster").props('id=dm_slider_label')
                         dm_slider = aria_slider(min=dm_slider_min, max=dm_slider_max,
-                        value=0.0, step=0.01,  aria_label="Dark matter fraction control slider").props('aria-describedby=dm_slider_label label-always debounce=300')
+                        value=0.0, step=0.01,  aria_label="Dark matter fraction control slider").props('aria-describedby=dm_slider_label label-always')
 
                         
                         

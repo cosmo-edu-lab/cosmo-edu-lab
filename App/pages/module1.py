@@ -87,6 +87,19 @@ def create_page():
         });
     }
 """)
+        ui.add_head_html('''
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css">
+        <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js"></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                MobileDragDrop.polyfill({
+                    holdToDrag: 250, // Tieni premuto 0.25s per trascinare su tablet
+                    dragImageTranslateOverride: window.mobileDragDrop.scrollBehaviourDragImageTranslateOverride
+                });
+                window.addEventListener('touchmove', function() {}, {passive: false});
+            });
+        </script>
+        ''')
         ui.add_head_html("""
     
     <style>
@@ -693,7 +706,26 @@ def create_page():
    #panel for observational methods and instruments
         def instrument_page(container):
             container.classes('w-full flex flex-col items-center justify-center text-center mx-auto gap-6')
+            available_galaxy_images = [
+                # Irregular (6)
+                'images/IC559_irregular.jpg', 'images/IC4710_irregular.jpg', 
+                'images/NGC1427_irregular.jpg', 'images/NGC7292_irregular.jpg', 
+                'images/NGC55_irregular.jpg', 'images/NGC5264_irregular.jpeg',
+                # Lenticular (6)
+                'images/NGC4921_lenticular.jpg', 'images/NGC1387_lenticular.png', 
+                'images/NGC2787_lenticular.jpg', 'images/NGC5866_lenticular.png', 
+                'images/NGC5010_lenticular.jpg', 'images/NGC4886_lenticular.jpeg',
+                # Elliptical (6)
+                'images/NGC1399_elliptical.png', 'images/NGC4365_elliptical.png', 
+                'images/IC2006_elliptical.jpg', 'images/NGC1316_elliptical.jpg', 
+                'images/NGC4150_elliptical.jpg', 'images/NGC2865_elliptical.jpeg',
+                # Spiral (6)
+                'images/NGC1068_spiral.jpg', 'images/NGC1232_spiral.jpg', 
+                'images/NGC_6217_spiral.jpg', 'images/NGC5335_spiral.jpg', 
+                'images/NGC1365_spiral.jpg', 'images/NGC1300_spiral.jpg'
+            ]
             
+            current_sim_image = {'path': 'images/NGC1232_spiral.jpg'}
             with container:
                 ui.label(
     "Discover how modern technology and sky surveys allow us to observe the deep universe and map the structure of the cosmos."
@@ -710,6 +742,20 @@ def create_page():
         <li> Move the sliders to adjust telescope diameter and exposure time in order to reveal the correct galaxy image on the plot.</li> 
         <li> Use the knowledge from the scientific background provided to optimize your settings for the best image quality.</li>
     </ol>
+    <div>
+    <h4 class="text-indigo-900 font-bold border-b border-indigo-100 pb-1 mb-2">3. Colormaps: Viridis & Inferno</h4>
+    <p class="text-gray-700 text-sm mb-2">
+        In astronomical imaging, raw data is monochromatic (grayscale). To better analyze intensity differences, we apply <b>colormaps</b>. In Cosmo-Edu Lab we use two standard scientific colormaps:
+    </p>
+    <ul class="list-disc ml-5 text-sm text-gray-800 space-y-2">
+        <li>
+            <b>Viridis:</b> A perceptually uniform colormap transitioning from dark purple to green and yellow. It is designed to be easily readable by people with common forms of color blindness and ensures that equal steps in data are perceived as equal steps by the human eye. It is the modern science standard for general imaging.
+        </li>
+        <li>
+            <b>Inferno:</b> A perceptually uniform colormap that ranges from black through deep purple, dark red, bright orange, to yellow. It is particularly useful for highlighting high-intensity peaks (such as bright stellar cores or active galactic nuclei) against faint backgrounds.
+        </li>
+    </ul>
+</div>
                         """)
                     aria_button("Close", "close popup", on_click=lambda:instruction_d.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
                     
@@ -754,7 +800,23 @@ def create_page():
                    
                     with ui.column().classes('w-full md:w-1/3 space-y-4 text-left'):
                         ui.label("Instrument Controls").classes('text-2xl font-bold text-white border-b border-gray-500 pb-2 w-full')
+                        def randomize_galaxy():
+                            import random
+                            choices = [img for img in available_galaxy_images if img != current_sim_image['path']]
+                            if not choices:
+                                choices = available_galaxy_images
+                            current_sim_image['path'] = random.choice(choices)
+                            
+                       
+                            diam_slider.value = 0.5
+                            time_slider.value = 10
+                            
+                            update_simulation()
+                            accessible_notify("Target galaxy changed randomly!", type_="info")
 
+                       
+                        aria_button("🎲 Change Target Galaxy", "Randomize target galaxy image", on_click=randomize_galaxy)\
+                            .classes("!bg-purple-600 hover:!bg-purple-700 text-white font-bold py-2 px-4 rounded shadow-md mb-2")
                         with ui.column().classes('w-full gap-1'):
                             ui.label("Telescope Diameter (m)").classes('font-bold text-white text-lg')
                             diam_slider = aria_slider(
@@ -810,7 +872,7 @@ def create_page():
                    
                         size = 300 
                         
-                        image_file_path = os.path.join(BASE_DIR, 'images', 'eso9845d.jpg')
+                        image_file_path = os.path.join(BASE_DIR, current_sim_image['path'])
                         true_flux = None
 
                         if os.path.exists(image_file_path):
@@ -892,8 +954,10 @@ def create_page():
                                 
                                 fig.subplots_adjust(left=0.05, right=0.82, top=0.80, bottom=0.05)
 
-                    diam_slider.on_value_change(update_simulation)
-                    time_slider.on_value_change(update_simulation)
+                    #diam_slider.on_value_change(update_simulation)
+                    #time_slider.on_value_change(update_simulation)
+                    diam_slider.on('change', lambda e: update_simulation())
+                    time_slider.on('change', lambda e: update_simulation())
                     sky_select.on_value_change(update_simulation)
                     cmap_select.on_value_change(update_simulation)
                     
@@ -1125,7 +1189,24 @@ def create_page():
     """)
                 ext_units_dialog.open()
         def introduction_page(container):
-            ui.run_javascript('window.gameRunning = false; window.gameScore = 0;')
+            #ui.run_javascript('window.gameRunning = false; window.gameScore = 0;')
+       
+            ui.run_javascript('''
+                window.gameRunning = false; 
+                window.gameScore = 0;
+                window.itemsPlaced = 0;
+                
+                // Abilita lo scorrimento automatico quando trascini un'immagine
+                document.addEventListener('dragover', function(e) {
+                    const edge = 100; // Distanza dal bordo in pixel per iniziare a scorrere
+                    const speed = 25; // Velocità di scorrimento
+                    if (e.clientY < edge) {
+                        window.scrollBy(0, -speed); // Scorri in su
+                    } else if (window.innerHeight - e.clientY < edge) {
+                        window.scrollBy(0, speed);  // Scorri in giù
+                    }
+                });
+            ''')
             timer_state = {'time': 0, 'running': False, 'started': False}
             container.classes('w-full flex flex-col items-center justify-center text-center mx-auto gap-6')
             with container:
@@ -1177,9 +1258,15 @@ def create_page():
              r'$\mathit{10^{-3} \;\text{--}\; 1 \, AU \;\mid\; 10^{-8} \;\text{--}\; 10^{-5} \, pc}$', 
              1e6, 1e9, "10^6 - 10^9 km"),
 
-            (r'$\mathbf{10^9 \;\text{--}\; 10^{18} \, km}$', 
-             r'$\mathit{1 \;\text{--}\; 10^9 \, AU \;\mid\; 10^{-5} \;\text{--}\; 10^4 \, pc}$', 
-             1e9, 1e18, "10^9 - 10^18 km"),
+         
+            (r'$\mathbf{10^9 \;\text{--}\; 10^{13} \, km}$', 
+             r'$\mathit{1 \;\text{--}\; 10^5 \, AU \;\mid\; 10^{-5} \;\text{--}\; 0.3 \, pc}$', 
+             1e9, 1e13, "10^9 - 10^13 km"),
+
+            (r'$\mathbf{10^{13} \;\text{--}\; 10^{18} \, km}$', 
+             r'$\mathit{10^5 \;\text{--}\; 10^9 \, AU \;\mid\; 0.3 \;\text{--}\; 10^4 \, pc}$', 
+             1e13, 1e18, "10^13 - 10^18 km"),
+            # ------------------------------------
 
             (r'$\mathbf{> 10^{18} \, km}$', 
              r'$\mathit{> 10^9 \, AU \;\mid\; > 10^4 \, pc}$', 
@@ -1197,8 +1284,8 @@ def create_page():
                                 ui.html(title_html).classes('font-bold text-lg text-white-500 leading-none text-center').props('role=heading aria-level=3')
                                 ui.html(sub_html).classes('text-md text-white-500 mt-1 leading-none text-center')
                                 
-                                drop_zone = ui.column().classes(
-                    "gap-1 mt-1 flex-wrap items-center justify-center w-full flex-grow h-full min-h-[60px] rounded bg-gray-50/50 border-2 border-dashed border-gray-300"
+                                drop_zone = ui.row().classes(
+                    "gap-2 mt-2 flex-wrap items-start justify-center w-full flex-grow h-full min-h-[80px] p-2 rounded bg-gray-50/50 border-2 border-dashed border-gray-300"
                 )
                                 
                                 js_logic = (
@@ -1217,16 +1304,43 @@ def create_page():
                                     f'  }} return; '
                                     f'}} '
                                     f'window.gameScore += 1; document.getElementById(\'score_display\').innerText = \'Score: \' + window.gameScore; '
+                                    
+                                    # 1. MESSAGGIO VERDE (Corretto: rimosse tutte le doppie virgolette)
+                                    f'let km = size.toExponential(2); '
+                                    f'let au = (size / 1.496e8).toExponential(2); '
+                                    f'let ly = (size / 9.461e12).toExponential(2); '
+                                    f'let pc = (size / 3.086e13).toExponential(2); '
+                                    f'let successMsg = \'✅ \' + data.title + \' posizionato/a! \' + km + \' km | \' + au + \' AU | \' + ly + \' ly | \' + pc + \' pc\'; '
+                                    f'if(window.Quasar && window.Quasar.Notify) {{ '
+                                    f'  window.Quasar.Notify.create({{ message: successMsg, color: \'positive\', position: \'top\', timeout: 6000 }}); '
+                                    f'}} '
+                                    
+                                    # CONTROLLO FINE GIOCO
+                                    f'window.itemsPlaced += 1; '
+                                    f'if(window.itemsPlaced === 24) {{ '
+                                    f'  window.gameRunning = false; '
+                                    f'  if(window.Quasar && window.Quasar.Notify) {{ '
+                                    f'    window.Quasar.Notify.create({{ message: \'End Game! All scales completed 🌌\', color: \'positive\', position: \'center\', timeout: 0, actions: [{{icon: \'close\', color: \'white\'}}] }}); '
+                                    f'  }} '
+                                    f'}} '
+                                    
+                                    # 2. MINIATURA ORIZZONTALE (Corretto: rimosse tutte le doppie virgolette)
                                     f'const scale=Math.max(55, Math.min(110, size/{max_s}*100)); ' 
                                     f'const col=document.createElement(\'div\'); '
-                                    f'col.style.display=\'flex\'; col.style.flexDirection=\'column\'; col.style.alignItems=\'center\'; col.style.margin=\'3px\'; '
+                                    f'col.style.display=\'flex\'; col.style.flexDirection=\'column\'; col.style.alignItems=\'center\'; col.style.margin=\'4px\'; '
                                     f'const img=document.createElement(\'img\'); '
-                                    f'img.src=data.file; img.width=scale; img.height=scale; img.style.objectFit=\'cover\'; img.className=\'rounded shadow-md\'; '
-                                    f'const lbl=document.createElement(\'div\'); lbl.innerText=data.title; lbl.style.fontSize=\'10px\'; lbl.style.fontWeight=\'bold\'; lbl.style.textAlign=\'center\'; '
+                                    f'img.src=data.file; img.style.width= scale + \'px\'; img.style.height= scale + \'px\'; img.style.objectFit=\'cover\'; img.className=\'rounded shadow-md border border-gray-400\'; '
+                                    f'const lbl=document.createElement(\'div\'); lbl.innerText=data.title; lbl.style.fontSize=\'10px\'; lbl.style.fontWeight=\'bold\'; lbl.style.textAlign=\'center\'; lbl.style.color=\'#333\'; lbl.style.maxWidth= scale + \'px\'; lbl.style.lineHeight=\'1.1\'; lbl.style.marginTop=\'4px\'; '
                                     f'col.appendChild(img); col.appendChild(lbl); '
                                     f'this.appendChild(col); '
+                                    
+                                    # 3. MANTIENI CLICCABILE E CONTORNO VERDE
                                     f'const sourceImg = document.getElementById(\'img-\' + data.safe_id); '
-                                    f'if(sourceImg) {{ sourceImg.style.opacity = \'0.3\'; sourceImg.style.filter = \'grayscale(1) blur(1px)\'; sourceImg.style.pointerEvents = \'none\'; }}"'
+                                    f'if(sourceImg) {{ '
+                                    f'  sourceImg.style.opacity = \'0.6\'; '
+                                    f'  sourceImg.style.filter = \'grayscale(0.5)\'; '
+                                    f'  sourceImg.style.border = \'4px solid #22c55e\'; ' 
+                                    f'}}"'
                                 )
                                 # ----------------------------------------------------
                                 drop_zone.props(js_logic)
@@ -1340,7 +1454,7 @@ def create_page():
                                 stop_game(),
                                 time_label.set_text('Time: 0s'),
                                 ui.run_javascript("window.gameScore = 0; document.getElementById('score_display').innerText = 'Score: 0';"),
-                                ui.run_javascript('document.querySelectorAll("[id^=\'img-\']").forEach(img => {img.style.opacity = "1"; img.style.filter = "none"; img.style.pointerEvents = "auto"})'),
+                                ui.run_javascript('document.querySelectorAll("[id^=\'img-\']").forEach(img => {img.style.opacity = "1"; img.style.filter = "none"; img.style.border = "none"; img.style.pointerEvents = "auto"})'),
                                 random.shuffle(IMAGES_MACRO),
                                 render_astroscales_board.refresh(),
                                 render_drop_column.refresh(),
@@ -2544,25 +2658,26 @@ def create_page():
                     ).classes("!bg-red-600 hover:!bg-red-700 text-white font-bold py-2 px-4 rounded shadow-md")
                     
                
-                    
-                ui.run_javascript('window.particleGameRunning = false; window.particleScore = 0;')
+                ui.run_javascript("window.particleGameRunning = false; window.particleScore = 0; window.particlesPlaced = 0; window.placedParticleCats = {};")
+                #ui.run_javascript('window.particleGameRunning = false; window.particleScore = 0;')
+                #ui.run_javascript("window.particleGameRunning = true; window.particleScore = 0; window.particlesPlaced = 0; document.getElementById('particle_score').innerText = 'Score: 0';")
                 timer_state = {'time': 0, 'running': False}
 
                 
                 GAME_PARTICLES = [
-                    {"symbol": "e⁻", "color": "#c8b8ff", "targets": ["Fermions", "Leptons"]},
-                    {"symbol": "μ⁻", "color": "#bda0ff", "targets": ["Fermions", "Leptons"]},
-                    {"symbol": "νₑ", "color": "#e6e0ff", "targets": ["Fermions", "Leptons"]},
-                    {"symbol": "u", "color": "#ffb4b4", "targets": ["Fermions", "Quarks"]},
-                    {"symbol": "d", "color": "#ffbcbc", "targets": ["Fermions", "Quarks"]},
-                    {"symbol": "s", "color": "#ff9a9a", "targets": ["Fermions", "Quarks"]},
-                    {"symbol": "γ", "color": "#fff1c2", "targets": ["Bosons"]},
-                    {"symbol": "g", "color": "#ffe59a", "targets": ["Bosons"]},
-                    {"symbol": "W±", "color": "#ffd27a", "targets": ["Bosons"]},
-                    {"symbol": "H", "color": "#ffe082", "targets": ["Bosons"]},
-                    {"symbol": "p", "color": "#cfe9ff", "targets": ["Fermions", "Hadrons", "Baryons"]},
-                    {"symbol": "n", "color": "#dff2ff", "targets": ["Fermions", "Hadrons", "Baryons"]},
-                    {"symbol": "π", "color": "#bfe0ff", "targets": ["Bosons", "Hadrons", "Mesons"]}
+                    {"symbol": "e⁻", "color": "#FF5733", "targets": ["Fermions", "Leptons"]},
+                    {"symbol": "μ⁻", "color": "#33FF57", "targets": ["Fermions", "Leptons"]},
+                    {"symbol": "νₑ", "color": "#3357FF", "targets": ["Fermions", "Leptons"]},
+                    {"symbol": "u", "color": "#F333FF", "targets": ["Fermions", "Quarks"]},
+                    {"symbol": "d", "color": "#FFB833", "targets": ["Fermions", "Quarks"]},
+                    {"symbol": "s", "color": "#33FFF5", "targets": ["Fermions", "Quarks"]},
+                    {"symbol": "γ", "color": "#B833FF", "targets": ["Bosons"]},
+                    {"symbol": "g", "color": "#FF3380", "targets": ["Bosons"]},
+                    {"symbol": "W±", "color": "#80FF33", "targets": ["Bosons"]},
+                    {"symbol": "H", "color": "#3380FF", "targets": ["Bosons"]},
+                    {"symbol": "p", "color": "#FFA133", "targets": ["Fermions", "Hadrons", "Baryons"]},
+                    {"symbol": "n", "color": "#33FFB8", "targets": ["Fermions", "Hadrons", "Baryons"]},
+                    {"symbol": "π", "color": "#FF3333", "targets": ["Bosons", "Hadrons", "Mesons"]}
                 ]
                 CATEGORIES = ["Fermions", "Leptons", "Quarks", "Bosons", "Hadrons", "Mesons", "Baryons"]
 
@@ -2600,7 +2715,7 @@ def create_page():
                             timer_state['running'] = True
                             timer_state['started'] = True
                             time_label.set_text("Time: 0s")
-                            ui.run_javascript("window.particleGameRunning = true; window.particleScore = 0; document.getElementById('particle_score').innerText = 'Score: 0';")
+                            ui.run_javascript("window.particleGameRunning = true; window.particleScore = 0; window.particlesPlaced = 0; window.placedParticleCats = {}; document.getElementById('particle_score').innerText = 'Score: 0';")
                             render_game.refresh()
 
                         def stop_game():
@@ -2631,7 +2746,7 @@ def create_page():
                                     for item in pool_items:
                                         ball = ui.label(item['symbol']).classes(
                                             'w-10 h-10 rounded-full flex items-center justify-center font-bold text-black shadow-md cursor-grab active:cursor-grabbing hover:scale-110 transition-transform'
-                                        ).style(f"background-color: {item['color']};")
+                                        ).style(f"background-color: {item['color']}; touch-action: none;")
                                         ball.props('draggable="true"')
                                         ball.props(f'id="{item["uid"]}"')
                                         target_str = ",".join(item['targets']) 
@@ -2653,6 +2768,15 @@ def create_page():
                                             f'if(!rawData) return; ' 
                                             f'const data = JSON.parse(rawData); '
                                             f'const targetCat = \'{box_name}\'; '
+                                            
+                                            # Inizializzazione sicura e controllo categorie doppie
+                                            f'if (typeof window.placedParticleCats === \'undefined\') window.placedParticleCats = {{}}; '
+                                            f'window.placedParticleCats[data.symbol] = window.placedParticleCats[data.symbol] || []; '
+                                            f'if(window.placedParticleCats[data.symbol].includes(targetCat)) {{ '
+                                            f'  if(window.Quasar && window.Quasar.Notify) {{ window.Quasar.Notify.create({{ message: \'You already placed this particle here! Try another category.\', color: \'warning\', position: \'top\' }}); }} '
+                                            f'  return; '
+                                            f'}} '
+                                            
                                             f'const targetArray = data.targets.split(\',\'); ' 
                                             f'if(!targetArray.includes(targetCat)) {{ '
                                             f'  window.particleScore -= 0.25; document.getElementById(\'particle_score\').innerText = \'Score: \' + window.particleScore; '
@@ -2660,12 +2784,22 @@ def create_page():
                                             f'  return; '
                                             f'}} '
                                             f'window.particleScore += 1; document.getElementById(\'particle_score\').innerText = \'Score: \' + window.particleScore; '
+                                            f'window.placedParticleCats[data.symbol].push(targetCat); '
+                                            
                                             f'const ball = document.createElement(\'div\'); '
                                             f'ball.className = \'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow-md m-0.5 text-black\'; '
                                             f'ball.style.backgroundColor = data.color; '
                                             f'ball.innerText = data.symbol; '
                                             f'this.appendChild(ball); '
+                                            
                                             f'const sourceBall = document.getElementById(data.uid); '
+                                            f'window.particlesPlaced += 1; '
+                                            f'if(window.particlesPlaced === 13) {{ '
+                                            f'  window.particleGameRunning = false; '
+                                            f'  if(window.Quasar && window.Quasar.Notify) {{ '
+                                            f'    window.Quasar.Notify.create({{ message: \'End Game! Quantum Mastery Achieved ⚛️\', color: \'positive\', position: \'center\', timeout: 0, actions: [{{icon: \'close\', color: \'white\'}}] }}); '
+                                            f'  }} '
+                                            f'}} '
                                             f'if(sourceBall) {{ sourceBall.style.visibility = \'hidden\'; sourceBall.style.pointerEvents = \'none\'; }}"'
                                         )
                                         drop_zone.props(js_logic)
@@ -2960,70 +3094,86 @@ def create_page():
                 aria_button('Close','close button', on_click=dialog.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
             dialog.open()
         def start_history_quiz():
+            def init_quiz():
+                q = [{'era': k, 'data': v} for k, items in DISCOVERY_EVENTS.items() for v in items]
+                random.shuffle(q)
+                return q[:10] # Seleziona 10 domande casuali
             
-            questions = [{'era': k, 'data': v} for k, items in DISCOVERY_EVENTS.items() for v in items]
-            random.shuffle(questions)
+            q_state = {'idx': 0, 'score': 0, 'time': 0, 'correct': False, 'questions': init_quiz()}
             
-           
-            q_state = {'idx': 0, 'score': 0, 'time': 0, 'correct': False}
-            
-            with ui.dialog() as q_dialog, ui.card().style('width: 600px; max-width: 95vw;').classes('p-6 items-center bg-slate-50').props('role=dialog aria-modal=true aria-labelledby=quiz_title'):
+            era_labels = {
+                "Prehistory and Ancient": "Prehistory & Ancient (< 1500 AD)",
+                "Classical and Renaissance": "Classical & Renaissance (1500 - 1700)",
+                "Eighteenth and Early Twentieth Century": "18th - Early 20th C. (1700 - 1950)",
+                "Space Age": "Space Age (1950 - 1990)",
+                "Modern Epoch": "Modern Epoch (1990 - 2020)",
+                "Present Time": "Present Time (2020 - Now)"
+            }
+
+            with ui.dialog() as q_dialog, ui.card().style('width: 600px; max-width: 95vw;').classes('p-6 items-center bg-slate-50').props('role=dialog aria-modal=true'):
                 aria_button('X', 'close', on_click=q_dialog.close).classes('absolute top-2 right-2 !bg-orange-500 hover:!bg-orange-700 text-white font-bold py-1 px-3 rounded z-50')
-                
-                ui.label('History of Astronomy Quiz').classes('text-2xl font-bold text-blue-600 mb-4 text-center').props('role=heading aria-level=2 tabindex=0')
+                ui.label('History of Astronomy Quiz').classes('text-2xl font-bold text-blue-600 mb-4 text-center')
                 
                 with ui.row().classes('w-full justify-between mb-4 bg-gray-200 p-3 rounded-lg border border-gray-300 shadow-inner'):
-                    global global_notification_area
-                    global_notification_area = ui.column().classes('w-full min-h-[50px] items-center justify-center mb-2')
                     time_lbl = ui.label('Time: 0s').classes('text-lg text-black font-bold')
                     score_lbl = ui.label('Score: 0').classes('text-lg text-blue-700 font-bold')
                 
                 q_text = ui.label('').classes('text-xl font-semibold text-black text-center mb-6 h-16 flex items-center justify-center')
                 
-               
                 with ui.grid(columns=2).classes('w-full gap-4') as btn_container:
                     for era in DISCOVERY_EVENTS.keys():
-                        aria_button(era, f"Select {era}", on_click=lambda e=era: check_ans(e)).classes('!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-3 rounded shadow-md')
+                        aria_button(era_labels[era], f"Select {era}", on_click=lambda e=era: check_ans(e)).classes('!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 rounded shadow-md text-xs px-2')
                 
-               
                 with ui.row().classes('w-full justify-center gap-4 mt-6') as action_row:
-                    explore_btn = aria_button("Explore Topic", "Read more", on_click=lambda: show_event_dialog(questions[q_state['idx']]['data'])).classes('!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                    explore_btn = aria_button("Explore Topic", "Read more", on_click=lambda: show_event_dialog(q_state['questions'][q_state['idx']]['data'])).classes('!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md')
                     next_btn = aria_button("Next Question ➔", "Next", on_click=lambda: next_question()).classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                    restart_btn = aria_button("Restart Quiz", "Restart", on_click=lambda: restart_quiz()).classes('!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md')
                 
                 def update_ui():
-                    if q_state['idx'] < len(questions):
+                    if q_state['idx'] < 10:
                         q_state['correct'] = False
-                        evt_title = questions[q_state['idx']]['data']['title']
+                        evt_title = q_state['questions'][q_state['idx']]['data']['title']
                         q_text.set_text(f"In which era did this occur: {evt_title}?")
                         explore_btn.set_visibility(False)
                         next_btn.set_visibility(False)
+                        restart_btn.set_visibility(False)
+                        btn_container.set_visibility(True)
                     else:
-                        q_text.set_text("Quiz Completed! Awesome job. 🎉")
+                        q_text.set_text("End Game! Quiz Completed. 🎉")
                         btn_container.set_visibility(False)
                         explore_btn.set_visibility(False)
                         next_btn.set_visibility(False)
+                        restart_btn.set_visibility(True)
                         q_timer.deactivate()
-                        accessible_notify('End Game! You completed the quiz.', color='positive', position='top', icon='emoji_events')
+                        ui.notify('End Game! You completed the quiz.', color='positive', position='top', icon='emoji_events')
                 
+                def restart_quiz():
+                    q_state['questions'] = init_quiz()
+                    q_state['idx'] = 0
+                    q_state['score'] = 0
+                    q_state['time'] = 0
+                    score_lbl.set_text('Score: 0')
+                    q_timer.activate()
+                    update_ui()
+
                 def next_question():
                     q_state['idx'] += 1
                     update_ui()
 
                 def check_ans(selected_era):
                     if q_state['correct']: return 
-                    correct_era = questions[q_state['idx']]['era']
-                    
+                    correct_era = q_state['questions'][q_state['idx']]['era']
                     if selected_era == correct_era:
                         q_state['score'] += 1
                         q_state['correct'] = True
                         score_lbl.set_text(f"Score: {q_state['score']}")
-                        accessible_notify('Correct! Great job.', color='positive', position='top', icon='check_circle')
+                        ui.notify('Correct! Great job.', color='positive', position='top', icon='check_circle')
                         explore_btn.set_visibility(True)
                         next_btn.set_visibility(True)
                     else:
                         q_state['score'] -= 0.25
                         score_lbl.set_text(f"Score: {q_state['score']}")
-                        accessible_notify('Wrong era! Try again.', color='negative', position='top', icon='cancel')
+                        ui.notify('Wrong era! Try again.', color='negative', position='top', icon='cancel')
                 
                 def tick():
                     q_state['time'] += 1
@@ -3268,47 +3418,65 @@ def create_page():
         
 
         def start_cosmic_quiz():
-    
-            questions = [{'era': k, 'data': v} for k, items in EPOCHS_EXTENDED.items() for v in items]
-            random.shuffle(questions)
+            def init_quiz():
+                q = [{'era': k, 'data': v} for k, items in EPOCHS_EXTENDED.items() for v in items]
+                random.shuffle(q)
+                return q[:10] # Seleziona 10 domande casuali
             
-            q_state = {'idx': 0, 'score': 0, 'time': 0, 'correct': False}
+            q_state = {'idx': 0, 'score': 0, 'time': 0, 'correct': False, 'questions': init_quiz()}
             
-            with ui.dialog() as q_dialog, ui.card().style('width: 600px; max-width: 95vw;').classes('p-6 items-center bg-gray-900 border border-gray-700').props('role=dialog aria-modal=true aria-labelledby=quiz_title'):
+            epoch_labels = {
+                "Near Big Bang": "Near Big Bang (0 - 10⁻¹⁰ s)",
+                "Early Universe": "Early Universe (3 min - 380k yr)",
+                "Structures Formation": "Structures Formation (400M - 3B yr)",
+                "Cosmic Web": "Cosmic Web (3B yr - Today)"
+            }
+
+            with ui.dialog() as q_dialog, ui.card().style('width: 600px; max-width: 95vw;').classes('p-6 items-center bg-gray-900 border border-gray-700').props('role=dialog aria-modal=true'):
                 aria_button('X', 'close', on_click=q_dialog.close).classes('absolute top-2 right-2 !bg-orange-500 hover:!bg-orange-700 text-white font-bold py-1 px-3 rounded z-50')
-                
-                ui.label('Cosmological Epochs Quiz').classes('text-2xl font-bold text-green-400 mb-4 text-center drop-shadow-md').props('role=heading aria-level=2 tabindex=0')
+                ui.label('Cosmological Epochs Quiz').classes('text-2xl font-bold text-green-400 mb-4 text-center drop-shadow-md')
                 
                 with ui.row().classes('w-full justify-between mb-4 bg-gray-800 p-3 rounded-lg border border-gray-600 shadow-inner'):
-                    global global_notification_area
-                    global_notification_area = ui.column().classes('w-full min-h-[50px] items-center justify-center mb-2')
                     time_lbl = ui.label('Time: 0s').classes('text-lg text-white font-bold')
-                    score_lbl = ui.label('Score: 0').classes('text-lg text-blue-400 font-bold').props('aria-live=polite')
+                    score_lbl = ui.label('Score: 0').classes('text-lg text-blue-400 font-bold')
                 
                 q_text = ui.label('').classes('text-xl font-semibold text-gray-100 text-center mb-6 h-16 flex items-center justify-center')
                 
                 with ui.grid(columns=2).classes('w-full gap-4') as btn_container:
                     for era in EPOCHS_EXTENDED.keys():
-                        aria_button(era, f"Select {era}", on_click=lambda e=era: check_ans(e)).classes('!bg-gray-700 hover:!bg-blue-600 border border-gray-500 text-white font-bold py-3 rounded shadow-lg transition-colors')
+                        aria_button(epoch_labels[era], f"Select {era}", on_click=lambda e=era: check_ans(e)).classes('!bg-gray-700 hover:!bg-blue-600 border border-gray-500 text-white font-bold py-2 rounded shadow-lg text-sm px-2')
                 
                 with ui.row().classes('w-full justify-center gap-4 mt-6') as action_row:
-                    explore_btn = aria_button("Explore Topic", "Read more", on_click=lambda: show_epoch_dialog(questions[q_state['idx']]['data'])).classes('!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                    explore_btn = aria_button("Explore Topic", "Read more", on_click=lambda: show_epoch_dialog(q_state['questions'][q_state['idx']]['data'])).classes('!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md')
                     next_btn = aria_button("Next Question ➔", "Next", on_click=lambda: next_question()).classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                    restart_btn = aria_button("Restart Quiz", "Restart", on_click=lambda: restart_quiz()).classes('!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md')
                 
                 def update_ui():
-                    if q_state['idx'] < len(questions):
+                    if q_state['idx'] < 10:
                         q_state['correct'] = False
-                        evt_name = questions[q_state['idx']]['data']['name']
+                        evt_name = q_state['questions'][q_state['idx']]['data']['name']
                         q_text.set_text(f"Which phase does this belong to: {evt_name}?")
                         explore_btn.set_visibility(False)
                         next_btn.set_visibility(False)
+                        restart_btn.set_visibility(False)
+                        btn_container.set_visibility(True)
                     else:
                         q_text.set_text("Quiz Completed! The Universe has no secrets for you. 🌌")
                         btn_container.set_visibility(False)
                         explore_btn.set_visibility(False)
                         next_btn.set_visibility(False)
+                        restart_btn.set_visibility(True)
                         q_timer.deactivate()
-                        accessible_notify('End Game! You completed the quiz.', color='positive', position='top', icon='emoji_events')
+                        ui.notify('End Game! You completed the quiz.', color='positive', position='top', icon='emoji_events')
+
+                def restart_quiz():
+                    q_state['questions'] = init_quiz()
+                    q_state['idx'] = 0
+                    q_state['score'] = 0
+                    q_state['time'] = 0
+                    score_lbl.set_text('Score: 0')
+                    q_timer.activate()
+                    update_ui()
 
                 def next_question():
                     q_state['idx'] += 1
@@ -3316,19 +3484,18 @@ def create_page():
 
                 def check_ans(selected_era):
                     if q_state['correct']: return
-                    correct_era = questions[q_state['idx']]['era']
-                    
+                    correct_era = q_state['questions'][q_state['idx']]['era']
                     if selected_era == correct_era:
                         q_state['score'] += 1
                         q_state['correct'] = True
                         score_lbl.set_text(f"Score: {q_state['score']}")
-                        accessible_notify('Correct! Great job.', color='positive', position='top', icon='check_circle')
+                        ui.notify('Correct! Great job.', color='positive', position='top', icon='check_circle')
                         explore_btn.set_visibility(True)
                         next_btn.set_visibility(True)
                     else:
                         q_state['score'] -= 0.25
                         score_lbl.set_text(f"Score: {q_state['score']}")
-                        accessible_notify('Wrong phase! Try again.', color='negative', position='top', icon='cancel')
+                        ui.notify('Wrong phase! Try again.', color='negative', position='top', icon='cancel')
                 
                 def tick():
                     q_state['time'] += 1
@@ -4017,7 +4184,13 @@ namelength=-1,
                         <p>Embark on a cosmic journey and experience the life cycle of a star firsthand!</p>
                         <ul style="margin-bottom: 25px;">
                             <li>Press <b>Start Evolution</b> to be "born" in a stellar nursery. You will be assigned a random <b>Solar Mass (M☉)</b>.</li>
-                            <li>Your destiny depends on your mass: low-mass stars, high-mass stars, and extremely massive stars follow very different paths.</li>
+                            <li>Your destiny depends on your initial mass (M☉): 
+                                <ul>
+                                    <li><b>Average-mass stars (≤ 8 M☉):</b> End their lives peacefully as White Dwarfs.</li>
+                                    <li><b>Massive stars (> 8 M☉ and ≤ 20 M☉):</b> Go supernova and leave behind a dense Neutron Star.</li>
+                                    <li><b>Extremely massive stars (> 20 M☉):</b> Collapse completely into a Black Hole.</li>
+                                </ul>
+                            </li>
                             <li>At each step, you must select the <b>correct next evolutionary phase</b> from the options provided.</li>
                             <li><b>Scoring:</b> You earn <b>1 point</b> for every correct stage reached. A wrong choice destabilizes your core, resulting in a <b>-0.25 point</b> penalty.</li>
                             <li>Complete the sequence to reach your final remnant state (White Dwarf, Neutron Star, or Black Hole) and finish the game.</li>
@@ -4325,7 +4498,7 @@ namelength=-1,
                                 accessible_notify("Correct evolution!", color="positive", position="top", icon="check_circle")
                                 if game_state['step'] >= len(game_state['path']):
                                     game_state['running'] = False
-                                    accessible_notify("End Game! Destiny reached.", color="purple", position="top", icon="emoji_events")
+                                    accessible_notify("End Game!", color="purple", position="top", icon="emoji_events")
                             else:
                                 game_state['score'] -= 0.25
                                 lbl_score.set_text(f"Score: {game_state['score']}")
@@ -4357,11 +4530,11 @@ namelength=-1,
                 
                 with ui.dialog() as instru, ui.card().classes('p-4 w-full max-w-[800px] overflow-x-auto'):
                     html_info_box(r"""
-                    <h3>How to play AstroLocation</h3>
+                   <h3>How to play AstroLocation</h3>
                     <p>Your mission is to find the exact location of our Solar System within the Milky Way!</p>
                     <ul>
                         <li>Click directly on the interactive map of the galaxy.</li>
-                        <li>A marker will appear where you click, and the system will tell you if you are too close to the center, too far, or in the right orbit but the wrong spiral arm.</li>
+                        <li>A marker will appear. The system will tell you if you are too close or too far <b>from the Galactic Center</b>, or if you found the right <b>orbit</b> (the circular distance from the center) but the wrong <b>spiral arm</b> (the dense, star-forming regions).</li>
                         <li>Read the <b>Info</b> section to find the mathematical clues (distance in kpc) needed to solve the puzzle.</li>
                     </ul>
                     """)
@@ -4500,36 +4673,31 @@ namelength=-1,
                             
                             if dist_error <= 1.5 and angle_correct:
                                 status = "✅ ORBIT FOUND!"
-                                color = "#4ade80" # Verde
+                                color = "#22c55e" # Verde molto più acceso
                                 msg = f"Distance: {r_kpc:.1f} kpc. Correct Location!"
                             elif dist_error <= 1.5 and not angle_correct:
                                 status = "⚠️ RIGHT ORBIT, WRONG ARM"
-                                color = "#facc15" # Giallo
+                                color = "#facc15" 
                                 msg = f"Distance correct ({r_kpc:.1f} kpc), but wrong position. We are in the Orion Arm!"
                             elif r_kpc < SUN_DIST_KPC:
-                                status = "🔥 TOO CLOSE"
-                                color = "#f87171" # Rosso
-                                msg = f"Distance: {r_kpc:.1f} kpc. Too hot!"
+                                status = "🔥 TOO CLOSE TO THE GALACTIC CENTER"
+                                color = "#ef4444" # Rosso
+                                msg = f"Distance: {r_kpc:.1f} kpc. Too close!"
                             else:
-                                status = "❄️ TOO FAR"
-                                color = "#60a5fa" # Blu
-                                msg = f"Distance: {r_kpc:.1f} kpc. Too cold!"
+                                status = "❄️ TOO FAR FROM THE GALACTIC CENTER"
+                                color = "#3b82f6" # Blu
+                                msg = f"Distance: {r_kpc:.1f} kpc. Too far!"
 
-                            feedback_label.text = status
-                            feedback_label.style(f'color: {color}; border-left: 5px solid {color}')
-                            
-                            
+                         
                             svg_content = f'''
-                                <line x1="{click_x-10}" y1="{click_y-10}" x2="{click_x+10}" y2="{click_y+10}" stroke="{color}" stroke-width="4" />
-                                <line x1="{click_x+10}" y1="{click_y-10}" x2="{click_x-10}" y2="{click_y+10}" stroke="{color}" stroke-width="4" />
-                                <text x="{click_x+20}" y="{click_y}" fill="white" font-weight="bold" font-size="24" style="text-shadow: 2px 2px 4px black;">YOU</text>
+                                <line x1="{click_x-10}" y1="{click_y-10}" x2="{click_x+10}" y2="{click_y+10}" stroke="{color}" stroke-width="5" />
+                                <line x1="{click_x+10}" y1="{click_y-10}" x2="{click_x-10}" y2="{click_y+10}" stroke="{color}" stroke-width="5" />
+                                <text x="{click_x+20}" y="{click_y}" fill="white" font-weight="900" font-size="28" style="text-shadow: 2px 2px 5px black, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">YOU</text>
                                 
-                                <circle cx="{CENTER_PX}" cy="{CENTER_PX}" r="{SUN_DIST_KPC * KPC_TO_PX}" fill="none" stroke="#fbbf24" stroke-width="2" stroke-dasharray="10,10" opacity="0.5" />
+                                <circle cx="{CENTER_PX}" cy="{CENTER_PX}" r="{SUN_DIST_KPC * KPC_TO_PX}" fill="none" stroke="white" stroke-width="3" stroke-dasharray="12,12" opacity="0.8" />
                             '''
                             
-                            
                             if dist_error <= 1.5:
-                                
                                 r_target_px = SUN_DIST_KPC * KPC_TO_PX
                                 x1 = CENTER_PX + r_target_px * math.cos(math.radians(TARGET_ANGLE_MIN))
                                 y1 = CENTER_PX + r_target_px * math.sin(math.radians(TARGET_ANGLE_MIN))
@@ -4537,14 +4705,15 @@ namelength=-1,
                                 y2 = CENTER_PX + r_target_px * math.sin(math.radians(TARGET_ANGLE_MAX))
                                 
                                 svg_content += f'''
-                                    <path d="M {CENTER_PX} {CENTER_PX} L {x1} {y1} A {r_target_px} {r_target_px} 0 0 1 {x2} {y2} Z" fill="#4ade80" fill-opacity="0.2" stroke="none" />
-                                    <text x="{CENTER_PX}" y="{CENTER_PX + r_target_px + 30}" text-anchor="middle" fill="#4ade80" font-weight="bold" font-size="18">Correct Zone</text>
+                                    <path d="M {CENTER_PX} {CENTER_PX} L {x1} {y1} A {r_target_px} {r_target_px} 0 0 1 {x2} {y2} Z" fill="#22c55e" fill-opacity="0.4" stroke="#22c55e" stroke-width="2" />
+                                    <text x="{CENTER_PX}" y="{CENTER_PX + r_target_px + 40}" text-anchor="middle" fill="#4ade80" font-weight="900" font-size="22" style="text-shadow: 2px 2px 4px black;">Correct Zone</text>
                                 '''
+                            
                             svg_content += f'''
-                                <text x="{CENTER_PX}" y="{CENTER_PX + 150}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Orion Arm</text>
-                                <text x="{CENTER_PX}" y="{CENTER_PX + 250}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Perseus Arm</text>
-                                <text x="{CENTER_PX}" y="{CENTER_PX - 120}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Sagittarius Arm</text>
-                                <text x="{CENTER_PX - 150}" y="{CENTER_PX - 50}" fill="rgba(255,255,255,0.7)" font-size="16" font-style="italic" text-anchor="middle">Scutum-Centaurus Arm</text>
+                                <text x="{CENTER_PX}" y="{CENTER_PX + 150}" fill="white" font-size="20" font-weight="bold" text-anchor="middle" style="text-shadow: 2px 2px 6px black;">Orion Arm</text>
+                                <text x="{CENTER_PX}" y="{CENTER_PX + 250}" fill="white" font-size="20" font-weight="bold" text-anchor="middle" style="text-shadow: 2px 2px 6px black;">Perseus Arm</text>
+                                <text x="{CENTER_PX}" y="{CENTER_PX - 120}" fill="white" font-size="20" font-weight="bold" text-anchor="middle" style="text-shadow: 2px 2px 6px black;">Sagittarius Arm</text>
+                                <text x="{CENTER_PX - 150}" y="{CENTER_PX - 50}" fill="white" font-size="20" font-weight="bold" text-anchor="middle" style="text-shadow: 2px 2px 6px black;">Scutum-Centaurus Arm</text>
                             '''
 
                             
@@ -4919,7 +5088,7 @@ namelength=-1,
             container.classes('w-full flex flex-col items-center justify-center text-center mx-auto gap-6')
             full_df = SDSS_GALAXY_DF.copy() 
             mem_state = {
-                'running': False, 'time': 0, 'score': 0,
+                'running': False, 'time': 0, 'score': 0, 'failed_attempts': 0,
                 'cards': [], 'flipped': [], 'matched': set(), 'lock': False
             }
            
@@ -4953,7 +5122,18 @@ namelength=-1,
                             <li>If they are a wrong pair, you lose <b>0.25 points</b> and the cards will flip back over after 1 second. Try to memorize them!</li>
                             <li>Clear the entire cosmic board to win. Use the <b>Reset</b> button if you want to restart the timer and shuffle again.</li>
                         </ul>
-
+<br>
+                        
+                        <h3 style="margin-top: 0; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">4. Galaxy Nomenclature (Catalogues)</h3>
+                        <p style="color: #4b5563;">Astronomers use specific acronyms to name galaxies based on the catalogue in which they were first recorded. Here are the most common ones you will encounter:</p>
+                        
+                        <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; border: 1px solid #bae6fd;">
+                            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                                <li><b>NGC (New General Catalogue):</b> Compiled in the 1880s by J.L.E. Dreyer, it is the most famous catalogue of deep-sky objects. (e.g., <i>NGC 1232</i>)</li>
+                                <li><b>IC (Index Catalogue):</b> Also compiled by Dreyer as a major update/supplement to the NGC in the late 19th and early 20th centuries to include fainter galaxies discovered with photography. (e.g., <i>IC 4710</i>)</li>
+                                <li><b>M (Messier Catalogue):</b> Created by French astronomer Charles Messier in 1771. It contains 110 bright objects (including galaxies, nebulae, and star clusters) that could be mistaken for comets. (e.g., <i>M31</i>, the Andromeda Galaxy)</li>
+                            </ul>
+                        </div>
                         <h3 style="margin-top: 0; color: #1d4ed8; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 15px;">2. Galaxies on the Map</h3>
                         <p>Use the buttons on the main panel to open the interactive plots:</p>
                         <ul>
@@ -5314,6 +5494,7 @@ namelength=-1,
                             mem_state['score'] = 0
                             mem_state['flipped'].clear()
                             mem_state['matched'].clear()
+                            mem_state['failed_attempts'] = 0
                             mem_state['lock'] = False
                             lbl_time.set_text("Time: 0s")
                             lbl_score.set_text("Score: 0")
@@ -5366,6 +5547,7 @@ namelength=-1,
                             mem_state['score'] = 0
                             mem_state['flipped'].clear()
                             mem_state['matched'].clear()
+                            mem_state['failed_attempts'] = 0
                             mem_state['lock'] = False
                             lbl_time.set_text("Time: 0s")
                             lbl_score.set_text("Score: 0")
@@ -5391,12 +5573,9 @@ namelength=-1,
 
                         async def handle_match():
                             import asyncio
-                          
-                            await asyncio.sleep(1.0)
+                            await asyncio.sleep(2.5)
                             
-                          
                             with current_client:
-                              
                                 if len(mem_state['flipped']) != 2:
                                     return
                                     
@@ -5404,20 +5583,27 @@ namelength=-1,
                                 card1 = next(c for c in mem_state['cards'] if c['id'] == id1)
                                 card2 = next(c for c in mem_state['cards'] if c['id'] == id2)
                                 
-                            
                                 if card1['type'] == card2['type']:
                                     mem_state['matched'].update([id1, id2])
                                     mem_state['score'] += 1
-                                    accessible_notify(f"Correct! Found two {card1['type']}.", color='positive', position='top', icon='check_circle')
+                                    ui.notify(f"Correct! Both are {card1['type']}.", color='positive', position='top', icon='check_circle')
                                 else:
-                                    mem_state['score'] -= 0.25
-                                    accessible_notify("Wrong pair! Memorize and try again...", color='negative', position='top', icon='cancel')
+                                    mem_state['failed_attempts'] += 1
+                                    if mem_state['failed_attempts'] > 2:
+                                        mem_state['score'] -= 0.25
                                     
+                                    types = sorted([card1['type'], card2['type']])
+                                    ui.notify(f"Wrong pair! You picked: {types[0]} and {types[1]}.", color='negative', position='top', icon='cancel')
+                                
                                 lbl_score.set_text(f"Score: {mem_state['score']}")
                                 
-                              
                                 mem_state['flipped'].clear()
                                 mem_state['lock'] = False
+
+                                if len(mem_state['matched']) == len(mem_state['cards']) and len(mem_state['cards']) > 0:
+                                    mem_state['running'] = False
+                                    ui.notify("End Game! 🌌", color='positive', position='top', timeout=0)
+
                                 render_memory_board.refresh()
 
                         def flip_card(card_id):
@@ -5448,7 +5634,7 @@ namelength=-1,
                                         ui.image(card['img']).classes('w-full h-full object-cover').props('aria-hidden="true"')
                                         
                                         # Mostra la label nell'angolo in basso a destra
-                                        ui.label(f"{card['name']} ({card['type']})").classes('absolute bottom-1 right-1 text-white text-[9px] md:text-[11px] bg-black/70 px-1.5 py-0.5 rounded font-bold text-right leading-tight')
+                                        ui.label(f"{card['name']}").classes('absolute bottom-1 right-1 text-white text-[9px] md:text-[11px] bg-black/70 px-1.5 py-0.5 rounded font-bold text-right leading-tight')
                                     else:
                                         # Retro della carta
                                         ui.element('div').classes('w-full h-full bg-blue-900 flex items-center justify-center').style('background-image: radial-gradient(circle, #1e3a8a, #0f172a);')
