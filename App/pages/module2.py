@@ -241,6 +241,10 @@ def create_page():
 
     def Mc_nfw_enclosed(r, M200, c, rho_crit_local):
         r = np.asarray(r, dtype=float)
+      
+        if M200 <= 0:
+            return np.zeros_like(r)
+            
         rho_s, r_s, r200 = rho_s_from_M200_and_c(M200, c, rho_crit_local)
         x = r / r_s
         numer = np.log(1.0 + x) - x / (1.0 + x)
@@ -429,57 +433,22 @@ def create_page():
     from scipy.special import sici
 
     def calculate_sigma_los_nfw(R_proj, M200, c, z_cluster, H0=70.0):
-        """
-        Calculates the line-of-sight velocity dispersion for an NFW halo.
-        This is based on the solution to the Jeans equation, assuming isotropy (beta=0).
-        Formula from Mamon & Łokas (2005), ApJ, 633, 794.
-        
-        Args:
-            R_proj (array): Projected radii in kpc.
-            M200 (float): Halo mass in Msun.
-            c (float): Concentration parameter.
-            z_cluster (float): Redshift of the cluster.
-            H0 (float): Hubble constant in km/s/Mpc.
-        
-        Returns:
-            sigma_los (array): Line-of-sight velocity dispersion in km/s.
-        """
+        R_proj = np.asarray(R_proj, dtype=float)
+        # Protezione zero mass
+        if M200 <= 0:
+            return np.zeros_like(R_proj)
+            
         rho_crit_local = rho_crit_Msunkpc3(H0)
         _, r_s, r200 = rho_s_from_M200_and_c(M200, c, rho_crit_local)
         
-        g = lambda x: np.log(1+x) - x/(1+x)
         V200 = G_grav * M200 / r200 # km^2/s^2
-        V_c_squared_rs = V200 * c / g(c) # Characteristic velocity squared at r_s
         
-        s = R_proj / r_s # Dimensionless projected radius
-        
-
-        term1 = np.where(s < 1, 0.5*s**2*(1 - (2/s)*np.arctan(np.sqrt((1-s)/(1+s))))/np.sqrt(1-s**2), 0.0)
-        term2 = np.where(s > 1, 0.5*s**2*(np.pi - (2/s)*np.arctanh(np.sqrt((s-1)/(s+1))))/np.sqrt(s**2-1), 0.0)
-
-        
-        Si_c, _ = sici(1+c)
-        Si_sc, _ = sici((1+c)*(1+s))
-        Si_smc, _ = sici((1+c)*(1-s))
-        
-        term3 = (np.cos(s*(1+c))*(Si_sc - Si_smc) + 
-                np.sin(s*(1+c))*(np.pi/2 - 0.5*(sici(2*s*(1+c))[0] - sici(2*(1+c))[0])))
-        
-        I_s = np.where(s < 1, term1, 0) + np.where(s > 1, term2, 0) \
-            + np.where(s == 1, 0.5*(1 - 2/np.pi), 0) # Handle s=1 case
-            
-    
-        
-        sigma_sq = V_c_squared_rs * s * (1+s)**2 * (g(c) / c) * (
-            (1 - 2*s**2) * (1/np.sqrt(np.abs(1-s**2))) * np.arccosh(1/s) + 
-            0.5*np.pi + np.log(s/2) + (s**2-1+np.log(s/2)) # Simplified terms
-        )
-    
+      
         A = 0.46; B = -0.6; C = 0.4
         x = R_proj / r200
         sigma_los_approx = np.sqrt(V200) * A * (1+x)**B * (1+C*x)
         
-        return sigma_los_approx # km/s
+        return np.nan_to_num(sigma_los_approx, nan=0.0) # Sostituisce eventuali NaN residui con 0
 
 
     @ui.page('/module2')
@@ -2882,7 +2851,7 @@ def create_page():
                                 #ui.html("<small class='text-gray-500'><i>Click to enlarge (Ref: ESA Hubble)</i></small>") #ui.html("<small class='text-gray-500'><i>Click to enlarge (Ref: ESA Hubble)</i></small>")
                                 galaxy_info_content = ui.column().classes('w-full text-sm text-gray-700 gap-0 p-0 m-0')
                             with ui.row().classes('w-full justify-center mt-2 shrink-0'):
-                                aria_button(" Table", "table", on_click=table_dialog2.open).classes("!bg-blue-500 text-white font-bold py-1 px-2 rounded mt-auto")
+                                aria_button("Image & Table", "table", on_click=table_dialog2.open).classes("!bg-blue-500 text-white font-bold py-1 px-2 rounded mt-auto")
 
             
                         with ui.column().classes('w-full justify-between items-center'):
@@ -4604,14 +4573,243 @@ def create_page():
 
                         else:
                             ui.label("Table not found").classes('text-red-500 text-center')
-                    with ui.dialog() as image_dialog, ui.card().classes('w-full max-w-xl p-0 border border-gray-200 shadow-md rounded-xl').props('aria-label="Cluster image" role=dialog aria-modal=true'):
-                        ui.html("<h5>Cluster Image</h5>")
-                        update_cluster_image()
-                        aria_button("close",'close',on_click=lambda:image_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                    # --- 1. DIALOG UNITO PER IMMAGINE E TABELLA (Cluster) ---
+                    with ui.dialog() as table_dialog_cluster, ui.card().style('width: 1200px; max-width: 95vw;').classes('p-8 border border-gray-200 shadow-md rounded-xl bg-white').props('aria-label="Cluster Information and Image" role=dialog'):
+                        with ui.element('div').style('display: flex; flex-direction: row; width: 100%; gap: 2rem; align-items: flex-start; justify-content: space-between;'):
+                            # Colonna Sinistra (Immagine)
+                            with ui.element('div').style('flex: 0 0 450px; display: flex; flex-direction: column; align-items: center;'):
+                                ui.html("<h4 style='margin-top: 0; font-weight: bold; color: #1e3a8a;'>Cluster Image</h4>")
+                                update_cluster_image()
+                            # Colonna Destra (Tabella)
+                            with ui.element('div').style('flex: 1 1 auto; width: 100%;'):
+                                update_cluster_table()
+                        with ui.row().classes('w-full justify-end mt-6'):
+                            aria_button("Close", 'close', on_click=lambda: table_dialog_cluster.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md")
+
+                    # --- 2. DIALOG 3D INTERATTIVO (Apre al click dell'immagine nel panel) ---
+                    with ui.dialog() as cluster_3d_info_dialog, ui.card().classes('p-6 w-full max-w-[800px] bg-white'):
+                        ui.label("Interactive 3D Tools Info").classes("text-2xl font-bold text-slate-800 mb-4")
+                        html_info_box(r"""
+                        <p><b>Visualizing the Cluster's Components</b></p>
+                        <ul>
+                            <li><b>Stellar Mass (Galaxies):</b> The visible galaxies that make up the cluster. Despite their brightness, they contribute only a tiny fraction (1-2%) to the total mass.</li>
+                            <li><b>Intracluster Gas (X-ray):</b> A massive cloud of extremely hot gas filling the space between galaxies. It represents the bulk of the "luminous" (baryonic) matter in the cluster (~13%).</li>
+                            <li><b>Dark Matter Halo:</b> The invisible scaffold holding everything together, representing roughly ~85% of the cluster's mass!</li>
+                        </ul>
+                        <hr style="margin: 10px 0;">
+                        <p><b>Interactive 3D Tools:</b></p>
+                        <ul>
+                            <li><i>Add dark matter moving the slider.</i></li>
+                            <li><i>Rotate the 3D plot with your mouse.</i></li>
+                            <li><b><i>Click on the items in the Legend to turn the Components on and off!</i></b></li>
+                        </ul>
+                        """)
+                        aria_button("Close", "close", on_click=cluster_3d_info_dialog.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded mt-2")
+
+                    with ui.dialog() as cluster_3d_dialog, ui.card().style('width: 1200px; max-width: 95vw; height: 90vh;').classes('p-6 overflow-hidden flex flex-col bg-white').props('aria-label="3D Cluster Model" role=dialog'):
+                        
+                        with ui.row().classes('w-full justify-between items-center mb-1 shrink-0'):
+                            ui.label("Cluster structure and mass distribution").classes("text-2xl font-bold text-slate-800")
+                            with ui.row().classes('gap-4'):
+                                aria_button("Info", 'instructions', on_click=lambda: [cluster_3d_info_dialog.open(), ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-6 rounded shadow-md")
+                                aria_button("Close", 'close', on_click=lambda: cluster_3d_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md")
+
+                        dialog_status_label_cluster = ui.label("").classes("text-xl font-bold text-center w-full my-1")
+                        
+                        with ui.row().classes('w-full items-center justify-center gap-4 mt-1 mb-4 shrink-0 bg-slate-50 p-4 rounded-xl shadow-inner border border-slate-200'):
+                            ui.label("Add Dark Matter:").classes("font-bold text-lg text-slate-800")
+                            dialog_cluster_dm_slider = ui.slider(min=0.0, max=60.0, value=0.0, step=0.01).classes('w-1/2').props('color=purple label-always')
+
+                        def evaluate_cluster_dm_status_dialog(e=None):
+                            try:
+                                f_slider = float(dialog_cluster_dm_slider.value)
+                                cluster_name = cluster_state.get('select', 'Cluster').removesuffix('.csv').removesuffix('.txt')
+                                
+                                m_bary_at_gal = cluster_state.get('m_bary_at_gal', [])
+                                if len(m_bary_at_gal) == 0: return
+                                
+                                M200 = cluster_state.get('M200', 1e14)
+                                m_stars_tot = np.sum(m_bary_at_gal)
+                                f_gas_global_fixed = 0.093 * (((0.7 * M200) / 2e14)**0.21)
+                                m_gas_global_fixed = (0.7 * M200) * f_gas_global_fixed
+                                M_bar_tot_fixed = m_stars_tot + m_gas_global_fixed
+                                
+                                M_tot_csv = M200
+                                M_DM_csv_tot = np.maximum(0.0, M_tot_csv - M_bar_tot_fixed)
+                                true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+                                
+                                S_max = getattr(dialog_cluster_dm_slider, 'max', 60.0)
+                                if cluster_name.lower() == 'abell1656(coma)':
+                                    max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
+                                    progress = float(f_slider / S_max) * max_progress
+                                else:
+                                    progress = float(f_slider / S_max)
+                                
+                                current_fraction = progress * true_dm_ratio
+                                target_fraction = true_dm_ratio
+                                
+                                if current_fraction < 0.05:
+                                    msg = "Dark matter missing! Move the slider to add mass."
+                                    color_class = "text-red-600"
+                                elif current_fraction < target_fraction - 0.04:
+                                    msg = f"More Dark Matter needed!"
+                                    color_class = "text-orange-500"
+                                elif current_fraction > target_fraction + 0.04:
+                                    msg = f"Too much Dark Matter!"
+                                    color_class = "text-orange-500"
+                                else:
+                                    msg = f"Perfect! The Dark Matter matches {cluster_name}'s virial mass."
+                                    color_class = "text-green-600"
+                                    
+                                dialog_status_label_cluster.set_text(msg)
+                                dialog_status_label_cluster.classes(replace=f"text-xl font-bold text-center w-full my-1 {color_class}")
+                            except Exception as ex:
+                                print(f"Error in cluster evaluate: {ex}")
+
+                        plot_3d_cluster_container = ui.column().classes('w-full flex-1 items-center justify-center overflow-hidden')
+
+                        @ui.refreshable
+                        def render_3d_cluster_plot():
+                            plot_3d_cluster_container.clear()
+                            with plot_3d_cluster_container:
+                                title_label = ui.label("").classes("text-xl font-bold text-slate-800 mb-2 mt-8 text-center w-full z-10")
+                                fig = go.Figure()
+                                
+                                custom_colorbar = dict(
+                                    title=dict(text="Velocity<br>Dispersion<br>(km/s)", font=dict(color='black', size=12), side='top'),
+                                    tickfont=dict(color='black', size=11), x=-0.12, thickness=15
+                                )
+                                r_max_plot = 2000.0
+
+                                if cluster_state.get('r_proj_kpc') is not None and len(cluster_state.get('r_proj_kpc', [])) > 0:
+                                    r_kpc = cluster_state['r_proj_kpc']
+                                    current_cluster = cluster_state.get('select', '').removesuffix('.csv').removesuffix('.txt')
+                                    r_max_plot = cluster_state.get('R200', np.nanmax(r_kpc)) * 1.05
+                                    
+                                    f_slider = float(dialog_cluster_dm_slider.value)
+                                    S_max = getattr(dialog_cluster_dm_slider, 'max', 60.0)
+                                    
+                                    m_bary_at_gal = cluster_state['m_bary_at_gal']
+                                    m_stars_tot = np.sum(m_bary_at_gal)
+                                    M200 = cluster_state.get('M200', 1e14)
+                                    c_nfw = cluster_state.get('c', 4.0)
+                                    
+                                    f_gas_global_fixed = 0.093 * (((0.7 * M200) / 2e14)**0.21)
+                                    m_gas_global_fixed = (0.7 * M200) * f_gas_global_fixed
+                                    M_bar_tot_fixed = m_stars_tot + m_gas_global_fixed
+                                    
+                                    M_tot_csv = M200
+                                    M_DM_csv_tot = np.maximum(0.0, M_tot_csv - M_bar_tot_fixed)
+                                    true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+                                    
+                                    if current_cluster.lower() == 'abell1656(coma)':
+                                        max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
+                                        progress = float(f_slider / S_max) * max_progress
+                                    else:
+                                        progress = float(f_slider / S_max)
+                                        
+                                    dm_ratio_display = progress * true_dm_ratio
+                                    dialog_cluster_dm_slider.props(f'label-value="DM: {dm_ratio_display * 100:.1f}%"')
+                                    title_label.set_text(f"3D Mass Distribution: {current_cluster}")
+
+                                    current_M_DM = progress * M_DM_csv_tot
+                                    current_M_tot = M_bar_tot_fixed + current_M_DM
+                                    
+                                    # Fissiamo i punti assoluti per non ingigantire il gas quando la DM è zero
+                                    n_gas = 1500 if m_gas_global_fixed > 0 else 0
+                                    n_dm = int(8000 * progress) if current_M_tot > 0 else 0
+
+                                    r_array = np.linspace(0.1, cluster_state.get('R200', 2000), 500)
+                                    
+                                    if m_gas_global_fixed > 0:
+                                        M_gas_enclosed = Mc_nfw_enclosed(r_array, m_gas_global_fixed, max(c_nfw*0.8, 0.1), cluster_state['rho_crit'])
+                                    else: M_gas_enclosed = np.zeros_like(r_array)
+                                    
+                                    # Profilo BURKERT per la Dark Matter (calcolato in base alla massa corrente)
+                                    rho_s = cluster_state.get('rho_s', 1.0)
+                                    r_s = cluster_state.get('r_s', 100.0)
+                                    M_dm_base = M_burkert_enclosed(r_array, rho_s, r_s)
+                                    if np.nanmax(M_dm_base) > 0 and current_M_DM > 0:
+                                        M_dm_enclosed = (M_dm_base / np.nanmax(M_dm_base)) * current_M_DM
+                                    else:
+                                        M_dm_enclosed = np.zeros_like(r_array)
+                                    
+                                    if current_M_tot > 0:
+                                        sigma_array = calculate_sigma_los_nfw(r_array, current_M_tot, max(c_nfw, 0.1), cluster_state.get('z_cluster', 0.02), 70.0)
+                                    else:
+                                        sigma_array = np.zeros_like(r_array)
+
+                                    c_min_plot = np.nanmin(sigma_array) if len(sigma_array) > 0 else 0
+                                    c_max_plot = np.nanmax(sigma_array) * 1.15 if (len(sigma_array) > 0 and np.nanmax(sigma_array) > 0) else 1000
+
+                                    def sample_cluster_component(m_array_enclosed, n_pts):
+                                        if n_pts <= 0 or np.nanmax(m_array_enclosed) <= 0:
+                                            return np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
+                                        CDF = m_array_enclosed / np.nanmax(m_array_enclosed)
+                                        CDF_clean = np.maximum.accumulate(np.nan_to_num(CDF))
+                                        U = np.random.uniform(0, 1, n_pts)
+                                        r_pts = np.interp(U, CDF_clean, r_array)
+                                        phi = np.arccos(np.random.uniform(-1, 1, n_pts))
+                                        theta = np.random.uniform(0, 2*np.pi, n_pts)
+                                        x = r_pts * np.sin(phi) * np.cos(theta)
+                                        y = r_pts * np.sin(phi) * np.sin(theta)
+                                        z = r_pts * np.cos(phi)
+                                        vel_pts = np.interp(r_pts, r_array, sigma_array)
+                                        mass_enc = np.interp(r_pts, r_array, m_array_enclosed)
+                                        return x, y, z, vel_pts, np.stack((r_pts, mass_enc), axis=-1)
+
+                                    traces = []
+                                    # 1. GALASSIE: Usano la dispersione peculiare e dimensioni ridotte
+                                    if len(cluster_state.get('x_kpc', [])) > 0:
+                                        x_gal = cluster_state['x_kpc']
+                                        y_gal = cluster_state['y_kpc']
+                                        r_gal = cluster_state['r_proj_kpc']
+                                        
+                                        std_r = np.std(r_gal) if len(r_gal) > 1 else 10.0
+                                        z_gal = np.random.normal(0, std_r, len(x_gal))
+                                        
+                                        # Calcola la peculiar velocity (reale dispersione) per non sforare la colorbar!
+                                        obs_mean = cluster_state.get('obs_mean', np.mean(cluster_state['observed_vel']))
+                                        v_gal_peculiar = np.abs(cluster_state['observed_vel'] - obs_mean)
+                                        
+                                        c_data_gal = np.stack((r_gal, np.full_like(r_gal, m_stars_tot)), axis=-1)
+                                        
+                                        # size=3 e color=v_gal_peculiar risolvono il rosso invasivo
+                                        traces.append(go.Scatter3d(x=x_gal, y=y_gal, z=z_gal, mode='markers', marker=dict(size=3, symbol='square', color=v_gal_peculiar, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.9), name=f'■ Galaxies (M: {m_stars_tot:.1e} M_☉)', customdata=c_data_gal, hovertemplate="<b>Galaxies (Real Data)</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Total Stellar Mass: %{customdata[1]:.1e} M_☉"))
+                                    
+                                    # 2. GAS: Fissato secondo Giodini, moderata grandezza
+                                    if n_gas > 0:
+                                        x, y, z, v, c_data = sample_cluster_component(M_gas_enclosed, n_gas)
+                                        traces.append(go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=3, symbol='cross', color=v, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.4), name=f'✖ Hot Gas (M: {m_gas_global_fixed:.1e} M_☉)', customdata=c_data, hovertemplate="<b>Intracluster Gas</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Enclosed Mass: %{customdata[1]:.1e} M_☉"))
+                                        
+                                    # 3. DARK MATTER: Dinamica
+                                    if n_dm > 0:
+                                        x, y, z, v, c_data = sample_cluster_component(M_dm_enclosed, n_dm)
+                                        traces.append(go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=2, symbol='circle', color=v, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.15), name=f'● DM Halo (M: {current_M_DM:.1e} M_☉)', customdata=c_data, hovertemplate="<b>Dark Matter (Burkert)</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Enclosed Mass: %{customdata[1]:.1e} M_☉"))
+                                    for trace in traces:
+                                        fig.add_trace(trace)
+                                        
+                                    fig.add_trace(go.Scatter3d(x=[None], y=[None], z=[None], mode='markers', marker=dict(colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, showscale=True, colorbar=custom_colorbar), showlegend=False, hoverinfo='skip'))
+                                else:
+                                    title_label.set_text("Waiting for valid Cluster Data...")
+                                    fig.add_trace(go.Scatter3d(x=[0], y=[0], z=[0], mode='markers', marker=dict(color='rgba(0,0,0,0)')))
+
+                                fig.update_layout(
+                                    scene=dict(xaxis=dict(visible=False, range=[-r_max_plot, r_max_plot]), yaxis=dict(visible=False, range=[-r_max_plot, r_max_plot]), zaxis=dict(visible=False, range=[-r_max_plot, r_max_plot]), bgcolor='rgb(15, 23, 42)', aspectmode='cube'),
+                                    margin=dict(l=0, r=0, b=0, t=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                    legend=dict(font=dict(color='white'), yanchor="top", y=0.95, xanchor="left", x=0.01),
+                                    autosize=False, width=1050, height=520
+                                )
+                                
+                                global my_cluster_3d_plot
+                                my_cluster_3d_plot = ui.plotly(fig).style('width: 1050px; height: 520px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);')
+
+                        render_3d_cluster_plot()
+                        
+                        dialog_cluster_dm_slider.on('change', lambda e: [evaluate_cluster_dm_status_dialog(), render_3d_cluster_plot.refresh()])
                     
-                    with ui.dialog() as table_dialog, ui.card().classes('w-full max-w-xl p-0 border border-gray-200 shadow-md rounded-xl').props('aria-label="Cluster information table" role=dialog'):
-                        update_cluster_table()
-                        aria_button("close",'close',on_click=lambda:table_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                    
+                    
                     chart_obs = None
                     chart_model = None
                     sim_timer = ui.timer(0.05, lambda: None, active=False)
@@ -4883,6 +5081,8 @@ def create_page():
                         theta_rad = angsep_rad(df_coma['ra'].values, df_coma['dec'].values, cluster_state['center_ra'], cluster_state['center_dec'])
                         r_proj_kpc = np.maximum(theta_rad * D_A_kpc, 1e-3)
                         cluster_state['r_proj_kpc'] = np.maximum(theta_rad * D_A_kpc, 1e-3)
+                        cluster_state['x_kpc'] = np.radians(df_coma['ra'].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
+                        cluster_state['y_kpc'] = np.radians(df_coma['dec'].values - cluster_state['center_dec']) * D_A_kpc
 
                         cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=70.0)
                         cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(df_coma['modelmag_r'].values, df_coma['extinction_r'].values, cluster_state['z_cluster'])
@@ -4960,7 +5160,9 @@ def create_page():
                         theta_rad = angsep_rad(df["RAdeg"], df["DEdeg"], cluster_state['center_ra'], cluster_state['center_dec'])
                         
                         cluster_state['r_proj_kpc'] = np.maximum(theta_rad * D_A_kpc, 1e-3)
-
+                        # Converte RA e DEC in offset spaziali fisici (kpc) rispetto al centro
+                        cluster_state['x_kpc'] = np.radians(df["RAdeg"].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
+                        cluster_state['y_kpc'] = np.radians(df["DEdeg"].values - cluster_state['center_dec']) * D_A_kpc
                         cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=70.0)
 
                         cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(
@@ -5275,7 +5477,7 @@ def create_page():
                         ui.label("Move the slider to add dark matter to the simulated velocity distribution in the cluster").props('id=dm_slider_label')
                         dm_slider = aria_slider(min=dm_slider_min, max=dm_slider_max,
                         value=0.0, step=0.01,  aria_label="Dark matter fraction control slider").props('aria-describedby=dm_slider_label label-always')
-
+                        dm_slider.bind_value(dialog_cluster_dm_slider, 'value')
                         
                         
                         
@@ -5286,13 +5488,20 @@ def create_page():
                             
                                 with ui.column().classes('w-full gap-1 p-0 m-0'):
                                     cluster_title_label = ui.label("Cluster Info: ---").classes("text-xl font-bold text-blue-800 mb-2 whitespace-nowrap")
-                                    cluster_img_display = ui.image().classes('w-full h-28 rounded cursor-pointer hover:scale-105 transition-transform').props('role=button tabindex=0 aria-label="Enlarge cluster image"').on('click', image_dialog.open).on('keydown.enter', image_dialog.open)
+                                    
+                                    async def open_cluster_3d():
+                                        evaluate_cluster_dm_status_dialog() 
+                                        render_3d_cluster_plot.refresh()
+                                        await asyncio.sleep(0.1)
+                                        cluster_3d_dialog.open()
+                                        ui.run_javascript("setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 200);")
+                                        
+                                    cluster_img_display = ui.image().classes('w-full h-28 rounded cursor-pointer hover:scale-105 transition-transform').props('role=button tabindex=0 aria-label="Open 3D Cluster Model"').on('click', open_cluster_3d).on('keydown.enter', open_cluster_3d)
                                     cluster_info_content = ui.column().classes('w-full text-sm text-gray-700 gap-0 p-0 m-0')
                                 
-                           
                                 with ui.row().classes('w-full justify-center mt-2 shrink-0'):
-                                    aria_button(" Table", "table", on_click=table_dialog.open).classes("!bg-blue-500 text-white font-bold py-1 px-2 rounded ")
-                          
+                                  
+                                    aria_button("Image & Table", "table", on_click=table_dialog_cluster.open).classes("!bg-blue-500 text-white font-bold py-1 px-4 rounded shadow-md")
                             with ui.column().classes('w-full justify-between items-center'):
                                 plot_container_histo = ui.column().classes('w-full')
                                 with ui.row().classes('w-full justify-center mt-2'):
@@ -5455,13 +5664,17 @@ def create_page():
                        
                         #new_max_clu = max(5.0, (sigma_obs / 100.0) * 3.0)
                       
-                        
-                 
                         dm_slider.max = round(new_max_clu, 1)
+                        dialog_cluster_dm_slider.max = round(new_max_clu, 1) # Mantiene sincronizzato il MAX
                         dm_slider.step = round(new_max_clu / 100.0, 2)
+                        dialog_cluster_dm_slider.step = round(new_max_clu / 100.0, 2)
                         dm_slider.value = 0.0
+                        dialog_cluster_dm_slider.value = 0.0
                         dm_slider.props(f'max="{new_max_clu}" step="{round(new_max_clu / 100.0, 2)}"')
                         dm_slider.update()
+                        dialog_cluster_dm_slider.update()
+                 
+                      
                         
                  
                         cluster_state['chi2_points'].clear()
@@ -6241,7 +6454,7 @@ def create_page():
 
            
 
-<li><b>Step 9:</b> Gas mass (Giodini, 2009 adapted for \(M_{200}\)):<br> <span class="math">\( M_{\mathrm{gas}} = (0.7 M_{200}) \cdot 0.093 \left( \frac{0.7 M_{200}}{2 \cdot 10^{14} / h} \right)^{0.21} \)</span></li>
+<li><b>Step 9:</b> Gas mass (Giodini, 2009 adapted for \(M_{200}\)):<br> <span class="math">\( M_{\mathrm{gas}} = (0.7 M_{200}) \cdot 0.093 \left( \frac{0.7 M_{200}}{2 \cdot 10^{14}} \right)^{0.21}\)</span></li>
 
     <li><b>Step 10:</b> Total Baryonic Mass:<br> <span class="math">\( M_{\mathrm{lum}} = M_{\mathrm{stars}} + M_{\mathrm{gas}} \)</span></li>
 
