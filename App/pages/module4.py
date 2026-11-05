@@ -49,7 +49,7 @@ import networkx as nx
 import requests
 from dotenv import load_dotenv
 from fastapi import Request
-#from groq import Groq
+from groq import Groq
 #from ipywidgets import interact, FloatSlider
 from nicegui import ui, app, run , client
 #from nicegui_toolkit import inject_layout_tool
@@ -500,15 +500,10 @@ def create_page():
         
             
             with container:
-                description_on_dark(
-    "Investigate how the stretching of light waves reveals the motion of celestial objects and the expansion of space itself. "
-)
-                with ui.dialog() as datalam,ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto'):
-                    reference_box("""**Dataset reference**: [SDSS-Galaxy spectra](https://www.sdss4.org/dr16/ , https://dr17.sdss.org/ , https://classic.sdss.org/dr6/algorithms/linestable.php), [NIST Atomic Spectra Database](https://www.nist.gov/pml/atomic-spectra-database)""")
-                    info_box("**Dataset**: wavelength (Å), flux (W·m⁻²·Å⁻¹).")
-                    aria_button("close","close",on_click=lambda: datalam.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-
-    
+                ui.label(
+    "Investigate how the stretching of light waves reveals the motion of celestial objects and the expansion of space itself."
+).classes('font-bold text-3xl text-blue-100 mt-4 drop-shadow-md text-center whitespace-pre-wrap w-full').props('role=heading aria-level=2 tabindex=0')
+                
                 
                 with ui.dialog() as info_red, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props("id=redshift-info role=document aria-live=polite"):
                     html_info_box(r"""
@@ -562,38 +557,50 @@ def create_page():
                     aria_button("Close", "close", on_click=cur_red.close).classes("!bg-orange-500 text-white font-bold py-2 px-4 rounded")
 
                 
-                with ui.dialog() as redshift_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props("id=redshift-dialog role=document aria-modal=true aria-labelledby=redshift-dialog-title"):
-                    html_info_box(r"""
+                def open_info_dialog_redshift():
+                    with ui.dialog() as d, ui.card().classes('p-0 w-full max-w-[1200px] h-[85vh] overflow-hidden').props('role=dialog aria-modal=true'):
+                        with ui.column().classes('w-full h-full bg-white flex flex-col'):
+                            with ui.row().classes('w-full justify-between items-center bg-slate-900 text-white p-4 shrink-0'):
+                                ui.label('Redshift Info').classes('text-xl font-bold')
+                                aria_button('Close', 'close', on_click=d.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                            with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as tabs:
+                                t_dataset = ui.tab('Dataset')
+                                t_theory = ui.tab('Redshift & Flux')
+                                tabs.on_value_change(lambda: ui.run_javascript("setTimeout(() => { if(typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 100)"))
+                            with ui.tab_panels(tabs, value=t_dataset).classes('w-full flex-1 overflow-y-auto bg-gray-50 text-slate-900 p-6'):
+                              
+                                with ui.tab_panel(t_dataset):
+                                    reference_box("""**Dataset reference**: [SDSS-Galaxy spectra](https://www.sdss4.org/dr16/ , https://dr17.sdss.org/ , https://classic.sdss.org/dr6/algorithms/linestable.php), [NIST Atomic Spectra Database](https://www.nist.gov/pml/atomic-spectra-database)""")
+                                    info_box("**Dataset**: wavelength (Å), flux (W·m⁻²·Å⁻¹).")
+                                    
+                                    template_url_redshift = "https://docs.google.com/spreadsheets/d/1n1B8PYZiBdJXc_p9HT-ce5TEJ9TOVR2q/copy"
+                                
+                                    with ui.row().classes('w-full justify-center gap-4 mt-4'):
+                                        aria_button('Build Google Sheet', 'Create copy Google Sheet', 
+                                            on_click=lambda: ui.run_javascript(f'window.open("{template_url_redshift}", "_blank")')) \
+                                            .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                        aria_button('Download Catalog', 'download dataset', 
+                                            on_click=lambda: ui.run_javascript('window.location.href = "/dataset/gal_spectra_data.xlsx"')) \
+                                            .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                with ui.tab_panel(t_theory):
+                                    html_info_box(r"""
         <h3>Redshift and Flux Relations</h3>
-
         <h4>Redshift and Velocity</h4>
         <p>When a galaxy moves away due to the expansion of the Universe, its spectral lines shift toward longer wavelengths (<b>redshift</b>):</p>
-        
-
-
-
-
         <div style="text-align:center; margin: 10px 0;">
             $$z = \frac{\lambda_{\rm obs} - \lambda_0}{\lambda_0}$$
         </div>
-
         <ul>
             <li><b>Small redshifts:</b> <span class="math">\( v = c \, z \)</span></li>
             <li><b>Relativistic:</b> <span class="math">\( v = c \, \frac{(1+z)^2 - 1}{(1+z)^2 + 1} \)</span></li>
         </ul>
-
         <hr style="margin: 15px 0; border-top: 1px solid #0284c7;">
-
         <h4>Flux–Luminosity Relation</h4>
         <p>The flux <span class="math">\( F(\lambda) \)</span> is the energy received per unit area, time, and wavelength (W·m⁻²·Å⁻¹). For isotropic emission from a source with intrinsic luminosity <span class="math">\( L \)</span> at luminosity distance <span class="math">\( d_L \)</span>:</p>
-        
         <p style="text-align:center;"><span class="math">\( F = \frac{L}{4 \pi d_L^2} \)</span></p>
-        
         <p>Including the effect of redshift:</p>
         <p style="text-align:center;"><span class="math">\( F(\lambda_{\rm obs}) = \frac{L(\lambda_{\rm emit})}{4 \pi d_L^2 (1+z)} \)</span></p>
-
         <hr style="margin: 15px 0; border-top: 1px solid #0284c7;">
-
         <h4>Relativistic Doppler Effect</h4>
         <p>For light, the observed frequency changes if the source and/or observer are moving relative to each other.</p>
         <ul>
@@ -601,12 +608,9 @@ def create_page():
             <li><b>Source approaching:</b> <span class="math">\( f_{\rm obs} = f_{\rm emit} \sqrt{\frac{1 + v/c}{1 - v/c}} \)</span></li>
         </ul>
         <p>Redshift corresponds to a wavelength increase (<span class="math">\( \lambda_{\rm obs} > \lambda_{\rm emit} \)</span>), blueshift corresponds to a wavelength decrease.</p>
-
         <hr style="margin: 15px 0; border-top: 1px solid #0284c7;">
-
         <h4>Common Spectral Lines (SDSS)</h4>
         <p>SDSS provides galaxy spectra (<span class="math">\( \lambda_{\rm obs}, F \)</span>) with key emission and absorption lines:</p>
-
         <table style="width:100%; border-collapse: collapse; margin-top: 10px; text-align:center;">
             <tr style="background-color: #bae6fd; color: #0c4a6e;">
                 <th style="border: 1px solid #0284c7; padding: 8px;">Element / Transition</th>
@@ -620,10 +624,8 @@ def create_page():
             <tr><td style="border: 1px solid #0284c7; padding: 8px;">Na I D</td><td style="border: 1px solid #0284c7; padding: 8px;">5890 / 5896</td></tr>
         </table>
         <p style="text-align:center; font-size: 0.9em; margin-top: 5px;"><i>Source: NIST Atomic Spectra Database</i></p>
-    """).props('tabindex=0 role=document aria-label="Redshift and Flux Relations information"')
-                    
-                    aria_button("Close", label="Close the box", on_click=lambda: redshift_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-
+                                    """)
+                    d.open()
                 with ui.row().classes("w-full items-center justify-center"):
                     csv_files = sorted([f for f in os.listdir(spectra_csv_dir) if f.lower().endswith(".csv")])
                     default_file = csv_files[0] if csv_files else None
@@ -632,14 +634,12 @@ def create_page():
 
                 
                     file_select = ui.select(csv_files, label="Choose spectrum CSV",value=default_file).classes("w-80").props('aria-describedby=tabs_desc aria-label="choose spectrum file"')
-                    plot_btn = aria_button("Plot Spectrum", "plot galaxy spectrum").classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Instructions","Instruction",on_click=lambda: [info_red.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Dataset","Data",on_click=lambda: datalam.open()).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Info",label="Read detailed information about Redshift and Flux Relations",on_click=lambda: [redshift_dialog.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Curiosity", "Open curiosity", on_click=cur_red.open).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded")
-            
-            
-
+                    
+                    plot_btn = aria_button("Plot Spectrum", "plot galaxy spectrum").classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
+                    
+                    aria_button("Instructions", "Instruction", on_click=lambda: [info_red.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Info", "Info", on_click=lambda: [open_info_dialog_redshift(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Curiosity", "Open curiosity", on_click=cur_red.open).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md")
             
                     known_lines = {
             "Hα": 6562.8,
@@ -1077,16 +1077,11 @@ def create_page():
         
 
             with container:
-                description_on_dark(
+                ui.label(
     "Use Type Ia Supernovae as 'standard candles' to measure vast cosmological distances and uncover the accelerating expansion of the Universe."
-)
+).classes('font-bold text-3xl text-blue-100 mt-4 drop-shadow-md text-center whitespace-pre-wrap w-full').props('role=heading aria-level=2 tabindex=0')
                 
                 
-                with ui.dialog() as datas_dialog, ui.card().classes('p-4 w-full max-w-[900px] max-h-[600px] overflow-y-auto').props('aria-label="information about supernovae dataset"'):
-                    reference_box("""**Dataset reference**: [Supernovae data Pantheon-SH0ES](https://github.com/dscolnic/Pantheon , https://pantheonplussh0es.github.io/)""")
-        
-                    info_box("**Dataset**: zcmb (CMB frame redshift), mb (apparent B magnitude), err_mag.")
-                    aria_button("Close", label="Close", on_click=lambda: datas_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
                 with ui.dialog() as cur_hub, ui.card().classes('p-4 w-full max-w-[600px]').props('aria-label="curiosity about faster than light recession"'):
                     html_info_box(r"""
                     <h3>Faster Than Light?</h3>
@@ -1097,45 +1092,60 @@ def create_page():
                     aria_button("Close", "close", on_click=lambda:cur_hub.close()).classes("!bg-orange-500 text-white font-bold py-2 px-4 rounded")
 
                 
-                with ui.dialog() as cosmology_dialog, ui.card().classes('p-4 w-full max-w-[900px] max-h-[600px] overflow-y-auto').props('aria-label="information about cosmology relations"'):
-                    html_info_box(r"""
-        <h3>Fundamental Cosmological Relations</h3>
-        
+                def open_info_dialog_hubble():
+                    with ui.dialog() as d, ui.card().classes('p-0 w-full max-w-[1200px] h-[85vh] overflow-hidden').props('role=dialog aria-modal=true'):
+                        with ui.column().classes('w-full h-full bg-white flex flex-col'):
+                            with ui.row().classes('w-full justify-between items-center bg-slate-900 text-white p-4 shrink-0'):
+                                ui.label('Hubble Law Info').classes('text-xl font-bold')
+                                aria_button('Close', 'close', on_click=d.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                            with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as tabs:
+                                t_dataset = ui.tab('Dataset')
+                                t_legend = ui.tab('Legend')
+                                t_cosmo = ui.tab('Cosmology Relations')
+                                t_lcdm = ui.tab('ΛCDM Info')
+                                tabs.on_value_change(lambda: ui.run_javascript("setTimeout(() => { if(typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 100)"))
+                            with ui.tab_panels(tabs, value=t_dataset).classes('w-full flex-1 overflow-y-auto bg-gray-50 text-slate-900 p-6'):
+                                with ui.tab_panel(t_dataset):
+                                    reference_box("""**Dataset reference**: [Supernovae data Pantheon-SH0ES](https://github.com/dscolnic/Pantheon , https://pantheonplussh0es.github.io/)""")
+                                    info_box("**Dataset**: zcmb (CMB frame redshift), mb (apparent B magnitude), err_mag.")
+                                    
+                                    template_url_hubble = "https://docs.google.com/spreadsheets/d/1XCab-tfIAcRrbAXosDR1V17dEjiu8BY0FnOPRhI5V9U/copy"
+                                  
+                                    with ui.row().classes('w-full justify-center gap-4 mt-4'):
+                                        aria_button('Build Google Sheet', 'Create copy Google Sheet', 
+                                            on_click=lambda: ui.run_javascript(f'window.open("{template_url_hubble}", "_blank")')) \
+                                            .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                        aria_button('Download Dataset', 'download dataset', 
+                                            on_click=lambda: ui.run_javascript('window.location.href = "/dataset/supernovae.xlsx"')) \
+                                            .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                with ui.tab_panel(t_legend):
+                                    html_info_box(r"""
+        <h3>Symbols and Units</h3>
         <ul>
-            <li>
-                <b>Hubble Law:</b><br>
-                <span class="math">\( v = H_0 \cdot d_L \)</span><br>
-                For small redshifts (<span class="math">\( z \ll 1 \)</span>), <span class="math">\( v \approx c \cdot z \)</span>.
-            </li>
-            
-            <li>
-                <b>Distance Modulus:</b><br>
-                <span class="math">\( \mu = m_B - M_B = 5 \log_{10}(d_L [\rm pc]) - 5 \)</span><br>
-                → connects apparent and absolute magnitude.
-            </li>
-            
-            <li>
-                <b>Luminosity Distance:</b><br>
-                <span class="math">\( d_L = (1+z)\frac{c}{H_0} \int_0^z \frac{dz'}{\sqrt{\Omega_m (1+z')^3 + \Omega_\Lambda}} \)</span><br>
-                → accounts for cosmological expansion (<span class="math">\(\Lambda\)</span>CDM model).
-            </li>
-            
-            <li>
-                <b>Scale Factor Relation:</b><br>
-                <span class="math">\( 1 + z = \frac{1}{a(t)} \)</span> → expansion of the Universe.
-            </li>
+            <li><b>c</b> = 299,792.458 km/s — speed of light</li>
+            <li><b>H₀</b> — Hubble constant [km/s/Mpc]</li>
+            <li><b>z</b> — redshift (dimensionless)</li>
+            <li><b>v<sub>nr</sub>, v<sub>rel</sub></b> — velocities [km/s]</li>
+            <li><b>d<sub>L</sub></b> — luminosity distance [Mpc]</li>
+            <li><b>μ</b> — distance modulus (mag)</li>
+            <li><b>m<sub>B</sub>, M<sub>B</sub></b> — apparent and absolute magnitude</li>
+            <li><b>Ωₘ, Ω_Λ</b> — density parameters (matter, dark energy)</li>
+            <li><b>a(t)</b> — cosmological scale factor</li>
         </ul>
-    """).props('aria-label="information about cosmology relations"')
-                    aria_button("Close", label="Close", on_click=lambda: cosmology_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-
-        
-                    
-
-            
-                with ui.dialog() as lcdm_dialog, ui.card().classes('p-4 w-full max-w-[900px] max-h-[600px] overflow-y-auto').props('aria-label="information about cosmology relations in model with cosmological constant"'):
-                    html_info_box(r"""
+                                    """)
+                                with ui.tab_panel(t_cosmo):
+                                    html_info_box(r"""
+        <h3>Fundamental Cosmological Relations</h3>
+        <ul>
+            <li><b>Hubble Law:</b><br><span class="math">\( v = H_0 \cdot d_L \)</span><br>For small redshifts (<span class="math">\( z \ll 1 \)</span>), <span class="math">\( v \approx c \cdot z \)</span>.</li>
+            <li><b>Distance Modulus:</b><br><span class="math">\( \mu = m_B - M_B = 5 \log_{10}(d_L [\rm pc]) - 5 \)</span><br>→ connects apparent and absolute magnitude.</li>
+            <li><b>Luminosity Distance:</b><br><span class="math">\( d_L = (1+z)\frac{c}{H_0} \int_0^z \frac{dz'}{\sqrt{\Omega_m (1+z')^3 + \Omega_\Lambda}} \)</span><br>→ accounts for cosmological expansion (<span class="math">\(\Lambda\)</span>CDM model).</li>
+            <li><b>Scale Factor Relation:</b><br><span class="math">\( 1 + z = \frac{1}{a(t)} \)</span> → expansion of the Universe.</li>
+        </ul>
+                                    """)
+                                with ui.tab_panel(t_lcdm):
+                                    html_info_box(r"""
         <h3>\(\Lambda\)CDM Explanation</h3>
-        
         <ul>
             <li><b>Velocity (non-relativistic):</b> <span class="math">\( v = c \cdot z \)</span></li>
             <li><b>Relativistic velocity:</b> <span class="math">\( v = c \frac{(1+z)^2 - 1}{(1+z)^2 + 1} \)</span></li>
@@ -1147,9 +1157,8 @@ def create_page():
             <li><b>\(\Lambda\)CDM distance:</b> <span class="math">\( d_L(z) = \frac{c (1+z)}{H_0} \int_0^z \frac{dz'}{E(z')}, \quad E(z) = \sqrt{\Omega_m (1+z)^3 + \Omega_\Lambda} \)</span></li>
             <li><b>Typical parameters:</b> <span class="math">\(\Omega_m = 0.3, \Omega_\Lambda = 0.7, \Omega_k = 0\)</span> (flat Universe)</li>
         </ul>
-    """).props('aria-label="information about cosmology relations in model with cosmological constant"')
-                    aria_button("Close", label="Close", on_click=lambda: lcdm_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                    
+                                    """)
+                    d.open()
                 with ui.dialog() as info_dlg, ui.card().props('aria-modal="true" role="dialog" aria-labelledby="info-title" aria-describedby="info-content"'):
                     ui.label("Information").classes("text-lg font-semibold text-blue-400").props("id=info-title ole=heading aria-level=2 tabindex=0")
     
@@ -1205,49 +1214,12 @@ def create_page():
 """).props("id=planck-info-content role=document aria-live=polite aria-describedby=info-content aria-label='Detailed information about redshift, flux, Hubble relation, Lambda CDM luminosity distance, velocities, and activity instructions.'")
                     aria_button("Close", label="Close", on_click=lambda: info_dlg.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
 
-                with ui.dialog() as leg_dlg, ui.card().props('aria-modal="true" role="dialog" aria-labelledby="legend-title" aria-describedby="legend-content"'):
-                    ui.label("Legend: Symbols and Units").classes("text-lg font-semibold text-blue-400").props("id=info-title ole=heading aria-level=2 tabindex=0")
-    
-                    html_info_box(r"""
-        <h3>Symbols and Units</h3>
-        <ul>
-            <li><b>c</b> = 299,792.458 km/s — speed of light</li>
-            <li><b>H₀</b> — Hubble constant [km/s/Mpc]</li>
-            <li><b>z</b> — redshift (dimensionless)</li>
-            <li><b>v<sub>nr</sub>, v<sub>rel</sub></b> — velocities [km/s]</li>
-            <li><b>d<sub>L</sub></b> — luminosity distance [Mpc]</li>
-            <li><b>μ</b> — distance modulus (mag)</li>
-            <li><b>m<sub>B</sub>, M<sub>B</sub></b> — apparent and absolute magnitude</li>
-            <li><b>Ωₘ, Ω_Λ</b> — density parameters (matter, dark energy)</li>
-            <li><b>a(t)</b> — cosmological scale factor</li>
-        </ul>
-    """).props("role=document aria-live=polite aria-describedby=info-content aria-label='Legend explaining symbols and units used in the Hubble Law with Type Ia Supernovae activity.'")
-                    aria_button("Close", label="Close", on_click=lambda: [leg_dlg.close(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-            
+                
 
-                with ui.row().classes("items-center gap-2 justify-center"):
-                    
-                    aria_button("Instructions ", "Information",on_click=lambda: [info_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                    aria_button("Dataset","data info",on_click=lambda: [datas_dialog.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                    aria_button("Legend ", "Variable and constants legend",on_click=lambda: [leg_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                    aria_button(
-                        "Fundamental Cosmology Relations",
-                        label="Show Fundamental Cosmological Relations",
-                        on_click=lambda: [
-                            cosmology_dialog.open(),
-                            ui.run_javascript("MathJax.typesetPromise()")
-                        ]
-                    ).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                    aria_button(
-                        "ΛCDM",
-                        label="Show ΛCDM Explanation",
-                        on_click=lambda: [
-                            lcdm_dialog.open(),
-                            ui.run_javascript("MathJax.typesetPromise()")
-                        ]
-                    ).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                    aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_hub.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded")
-                    
+                with ui.row().classes("items-center gap-4 justify-center mt-4"):
+                    aria_button("Instructions", "Information", on_click=lambda: [info_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Info", "Info", on_click=lambda: [open_info_dialog_hubble(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_hub.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md")
                     H0_box = ui.number(label="H₀ [km/s/Mpc]", format="%.3f").classes("w-44").props('aria-label="Hubble constant H0 in km per second per Megaparsec"')
                 
                     M_B_input = ui.number(label="Absolute Magnitude M_B (SNe Ia)", value=-19.3, format="%.3f").classes("w-52").props('aria-label="Absolute Magnitude of Type Ia Supernovae M sub B"')
@@ -1543,35 +1515,20 @@ def create_page():
                             #plt.xscale('log'); plt.yscale('log')
                             plt.legend(); plt.tight_layout()
                             aria_chart_label("Plot of distance modulus μ versus redshift z")
-                    aria_button("Add v_rel","add relativistic velocity" ,on_click=lambda: (state.update(show_vrel=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Add Hubble line", "add Hubble line",on_click=lambda: (state.update(show_hubble_line=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Add Hubble mag","add Hubble magnitude", on_click=lambda: (state.update(show_mag_hubble=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Add CDM", "add only matter model",on_click=lambda: (state.update(show_noLambda=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-                    aria_button("Add ΛCDM", "add cosmological model",on_click=lambda: (state.update(show_lcdm=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-
+                    aria_button("Add v_rel","add relativistic velocity" ,on_click=lambda: (state.update(show_vrel=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Add Hubble line", "add Hubble line",on_click=lambda: (state.update(show_hubble_line=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Add Hubble mag","add Hubble magnitude", on_click=lambda: (state.update(show_mag_hubble=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Add CDM", "add only matter model",on_click=lambda: (state.update(show_noLambda=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button("Add ΛCDM", "add cosmological model",on_click=lambda: (state.update(show_lcdm=True), plot_all())).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
                 plot_all()
 
 
    #panel cosmic microwave background     
         def add_cmb_activity(container):
             with container:
-                description_on_dark("Investigate how the Cosmic Microwave Background (CMB) affects the universe composition.")
-                with ui.dialog() as ref_dialog, ui.card().classes("p-4 w-full max-w-[1300px]").props('role=dialog aria-label="References"'):
-                    reference_box("""
-    **Planck Simulator References:**  
-    - [Chris North Planck Simulator](https://chrisnorth.github.io/planckapps/Simulator)  
-    - [UCSB Planck Project](https://www.deepspace.ucsb.edu/projects/planck)  
-
-    """)
-                    
-                    reference_box("""
-
-    **Images References:**  
-    - [ESA Planck Overview](https://sci.esa.int/web/planck/-/51551-simple-but-challenging-the-universe-according-to-planck)  
-    - [Planck Image Archive](https://planck.ipac.caltech.edu/page/contacts)  
-    """)
-                    aria_button("Close", "close popup", on_click=lambda:ref_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                
+                ui.label(
+    "Investigate how the Cosmic Microwave Background (CMB) affects the universe composition."
+).classes('font-bold text-3xl text-blue-100 mt-4 drop-shadow-md text-center whitespace-pre-wrap w-full').props('role=heading aria-level=2 tabindex=0')
                 with ui.dialog() as instruction_d , ui.card().classes("p-4 w-full max-w-[800px]").props('role=dialog aria-label="Instructions"'):
                     html_info_box("""
     <h2 class="text-2xl font-bold mb-4">CMB Instructions</h2>
@@ -1583,24 +1540,55 @@ def create_page():
     </ol>
                     """)
                     aria_button("Close", "close popup", on_click=lambda:instruction_d.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                
+                def open_info_dialog_cmbde():
+                    with ui.dialog() as d, ui.card().classes('p-0 w-full max-w-[1000px] h-[80vh] overflow-hidden').props('role=dialog aria-modal=true'):
+                        with ui.column().classes('w-full h-full bg-white flex flex-col'):
+                            with ui.row().classes('w-full justify-between items-center bg-slate-900 text-white p-4 shrink-0'):
+                                ui.label('CMB & Dark Energy Info').classes('text-xl font-bold')
+                                aria_button('Close', 'close', on_click=d.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                            
+                            with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as tabs:
+                                t_ref = ui.tab('References')
+                                t_dataset = ui.tab('Dataset') # <-- Aggiunto il tab per il dataset
+                                
+                            with ui.tab_panels(tabs, value=t_ref).classes('w-full flex-1 overflow-y-auto bg-gray-50 text-slate-900 p-6'):
+                                with ui.tab_panel(t_ref):
+                                    reference_box("""
+    **Planck Simulator References:**  
+    - [Chris North Planck Simulator](https://chrisnorth.github.io/planckapps/Simulator)  
+    - [UCSB Planck Project](https://www.deepspace.ucsb.edu/projects/planck)  
+    """)
+                                    reference_box("""
+    **Images References:**  
+    - [ESA Planck Overview](https://sci.esa.int/web/planck/-/51551-simple-but-challenging-the-universe-according-to-planck)  
+    - [Planck Image Archive](https://planck.ipac.caltech.edu/page/contacts)  
+    """)
+                                
+                                # IL NUOVO TAB CON I BOTTONI VERDI PER IL POWER SPECTRUM
+                                with ui.tab_panel(t_dataset):
+                                    info_box("**Dataset**: l (multipole moment), Dl (power spectrum), -dDl (lower error), +dDl (upper error)")
+                                    reference_box("""**Dataset reference**: [ESA Planck Legacy Archive](https://pla.esac.esa.int/)""")
+                                    
+                                    template_url_power = "https://docs.google.com/spreadsheets/d/1TWFwm-RMhxMye-EjIFr3XSG3hhQE6EAunnE-EQHc9Uk/copy"
+                                   
+                                    with ui.row().classes('w-full justify-center gap-4 mt-4'):
+                                        aria_button('Build Google Sheet', 'Create copy Google Sheet', 
+                                            on_click=lambda: ui.run_javascript(f'window.open("{template_url_power}", "_blank")')) \
+                                            .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                        aria_button('Download Dataset', 'download dataset', 
+                                            # Ricorda di mettere il file txt (o xlsx se lo converti) nella cartella dataset!
+                                            on_click=lambda: ui.run_javascript('window.location.href = "/dataset/COM_PowerSpect_CMB-TT-full_R3.01.xlsx"')) \
+                                            .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                    d.open()
                 
 
 
-                with ui.row().classes('w-full gap-8 justify-center'):
-                    aria_button('Instructions',"Module Instructions", on_click=lambda:instruction_d.open()).classes("!bg-blue-600 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded")
-                
-                    aria_button('References',"References", on_click=lambda:ref_dialog.open()).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
+                with ui.row().classes('w-full gap-4 justify-center mt-4'):
+                    aria_button('Instructions', "Module Instructions", on_click=lambda:instruction_d.open()).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button('Info', "Detailed Information", on_click=lambda: open_info_dialog_cmbde()).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
                     
-            
-                    
-                        
-                    aria_button('Explore the Planck CMB Simulator',"Explore the interactive Plank CMB simulator",
-        on_click=safe_click(lambda: ui.run_javascript("window.open('https://chrisnorth.github.io/planckapps/Simulator', '_blank')"))).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-
-                        
-                    aria_button('ESA: The Universe According to Planck', "ESA reference website",on_click=safe_click(lambda: ui.run_javascript("window.open('https://sci.esa.int/web/planck/-/51551-simple-but-challenging-the-universe-according-to-planck','_blank')"))).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
-                    
+                    aria_button('Explore Planck CMB Simulator', "Explore the interactive Plank CMB simulator", on_click=safe_click(lambda: ui.run_javascript("window.open('https://chrisnorth.github.io/planckapps/Simulator', '_blank')"))).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
+                    aria_button('ESA: The Universe According to Planck', "ESA reference website", on_click=safe_click(lambda: ui.run_javascript("window.open('https://sci.esa.int/web/planck/-/51551-simple-but-challenging-the-universe-according-to-planck','_blank')"))).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
                 with ui.row().classes('w-full mx-auto place-items-center justify-center gap-8'):
                     
                     aria_image('/images/univ_composition.jpg', "Image of the universe composition with dark energy,dark matter and ordinary matter").classes('w-80 h-auto rounded-lg shadow-lg border border-gray-300')

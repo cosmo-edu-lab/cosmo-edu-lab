@@ -7,7 +7,7 @@ from functools import lru_cache
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import Request
-#from groq import Groq
+from groq import Groq
 #from ipywidgets import interact, FloatSlider
 import nicegui
 from nicegui import ui, app, run , client
@@ -29,7 +29,7 @@ from math import isfinite
 #inject_layout_tool()
 import numpy as np
 import matplotlib.pyplot as plt
-from google import genai
+#from google import types
 import sys
 import asyncio
 DATASET_REPO_ID = "CosmoEduLab/Cosmo_login" 
@@ -40,7 +40,7 @@ _cluster_calc_cache = {}
 
 load_dotenv()
 
-
+MODULES_LOCKED = True
     
 @app.get('/.well-known/appspecific/com.chrome.devtools.json')
 async def chrome_devtools_stub():
@@ -78,11 +78,11 @@ DATA_FILE = 'app_data.json'
 app_data = {'users': {}, 'reflection_log': []}
 
 if getattr(sys, 'frozen', False):
-    
+    # Se siamo nell'eseguibile compilato (Win/Mac/Linux)
     ASSET_DIR = sys._MEIPASS 
-    USER_DIR = os.path.dirname(sys.executable) 
+    USER_DIR = os.path.dirname(sys.executable)
 else:
-   
+    # Se siamo in locale o su Codespace
     ASSET_DIR = os.path.dirname(os.path.abspath(__file__))
     USER_DIR = ASSET_DIR
 
@@ -128,7 +128,7 @@ def load_data():
                 filename=DATASET_FILENAME,
                 repo_type="dataset",
                 token=HF_TOKEN,
-                local_dir=USER_DIR, 
+                local_dir=USER_DIR, # MODIFICATO: Prima era BASE_DIR
             )
             with open(file_path, 'r') as f:
                 downloaded_data = json.load(f)
@@ -153,20 +153,20 @@ def load_data():
 
 def save_data():
     global app_data
-    
+    # 1. LOCAL SAVE
     try:
-    
+        # MODIFICATO: Usa direttamente LOCAL_DATA_FILE che ha già il path assoluto corretto
         with open(LOCAL_DATA_FILE, 'w') as f:
             json.dump(app_data, f, indent=4)
     except Exception as e:
         print(f"❌ Error saving local data: {e}")
 
-   
+    # 2. CLOUD SYNC
     if HF_TOKEN:
         def _upload_task():
             try:
                 api = HfApi(token=HF_TOKEN)
-               
+                # MODIFICATO: Usa direttamente LOCAL_DATA_FILE
                 api.upload_file(
                     path_or_fileobj=LOCAL_DATA_FILE,
                     path_in_repo=DATASET_FILENAME,

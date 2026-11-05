@@ -8,7 +8,7 @@ import nicegui
 from nicegui import ui, app, run , client
 import asyncio
 import datetime
-#from groq import Groq
+from groq import Groq
 import urllib.parse
 #from nicegui_toolkit import inject_layout_tool
 
@@ -16,7 +16,7 @@ import urllib.parse
 from core import *
 from layout import *
 
-MODULES_LOCKED = os.getenv("MODULES_LOCKED", "True") == "True"
+#MODULES_LOCKED = os.getenv("MODULES_LOCKED", "True") == "True"
 #inject_layout_tool()
 #<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
 ui.add_head_html("""
@@ -111,9 +111,8 @@ def create_routes():
                     ('discovery', 'Discoveries Timeline', '🔭'),
                     ('universe', 'Universe Evolution', '⏳'),
                     ('instrument', 'Observational Methods', '📡'),
-                 
                     ('galaxy', 'Galaxies', '🌀'),
-                       ('milkyway', 'Milky Way', '🌌'),
+                    ('milkyway', 'Milky Way', '🌌'),
                     ('stars', 'Stars', '✨'),
                     ('particles', 'Fundamental Particles', '⚛️')
                 ],
@@ -123,18 +122,36 @@ def create_routes():
                     ('galdm', 'Galaxy mass & DM', '⚖️'),
                     ('cluster', 'Cluster velocity', '🚀'),
                     ('clusdm', 'Cluster mass & DM', '🌌')
+                ],
+                3: [
+                    ('planck', 'Planck spectrum', '🌡️'),
+                    ('index', 'CMB Adiabatic Index', '📉'),
+                    ('radmat', 'Radiation & Matter', '⚖️')
+                ],
+                4: [
+                    ('redshift', 'Cosmological Redshift', '🌈'),
+                    ('hubble', 'Hubble law', '🔭'),
+                    ('cmb', 'CMB & Dark Energy', '🌌')
                 ]
             }
 
-            
             def handle_card_click(mod):
                 """Quando si clicca sulla CARD principale, forza il ritorno al primo panel di default"""
-                key = 'module1_selected' if mod == 1 else 'module2_selected'
-                default_val = 'intro' if mod == 1 else 'kepler'  # I primi pannelli di Modulo 1 e 2
+                if mod == 1:
+                    key = 'module1_selected'
+                    default_val = 'intro'
+                elif mod == 2:
+                    key = 'module2_selected'
+                    default_val = 'kepler'
+                elif mod == 3:
+                    key = 'module3_selected_tab'
+                    default_val = 'planck'
+                elif mod == 4:
+                    key = 'module4_selected'
+                    default_val = 'redshift'
                 
                 app.storage.user[key] = default_val
                 
-               
                 ui.timer(0.1, lambda: (
                     ui.navigate.to(f'/module{mod}'),
                     ui.run_javascript("setTimeout(() => document.querySelector('h1, .title')?.focus(), 3600)")
@@ -204,7 +221,14 @@ def create_routes():
                                 
                                 ui.label('Quick Access').classes('text-blue-300 text-xs font-bold uppercase tracking-widest text-center w-full mb-1 border-b border-blue-500/30 pb-2')
                                 
-                                tab_storage_key = 'module1_selected' if i == 1 else 'module2_selected'
+                                if i == 1:
+                                    tab_storage_key = 'module1_selected'
+                                elif i == 2:
+                                    tab_storage_key = 'module2_selected'
+                                elif i == 3:
+                                    tab_storage_key = 'module3_selected_tab'
+                                elif i == 4:
+                                    tab_storage_key = 'module4_selected'
                                 
                               
                                 for tab_val, tab_label, icon in module_panels[i]:

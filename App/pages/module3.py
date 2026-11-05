@@ -48,7 +48,7 @@ import networkx as nx
 import requests
 from dotenv import load_dotenv
 from fastapi import Request
-#from groq import Groq
+from groq import Groq
 #from ipywidgets import interact, FloatSlider
 from nicegui import ui, app, run , client
 #from nicegui_toolkit import inject_layout_tool
@@ -399,19 +399,12 @@ def create_page():
 
             
                 with container:
-                    description_on_dark(
+                    ui.label(
     "Explore the nature of thermal radiation to understand how the Black Body spectrum describes the afterglow of the Big Bang."
-)
+).classes('font-bold text-3xl text-blue-100 mt-4 drop-shadow-md text-center whitespace-pre-wrap w-full').props('role=heading aria-level=2 tabindex=0')
                     
-                    with ui.dialog() as plank,ui.card().props('aria-label="COBE-FIRAS dataset information dialog" role=dialog aria-modal=true'):
                     
-                        reference_box("""**Dataset reference**: Fixsen et al. (1996), The Astrophysical Journal. [COBE-FIRAS monopole spetrum](https://lambda.gsfc.nasa.gov/product/cobe/firas_monopole_spect.html)""")
-                        info_box("**Dataset**:frequency(cm^-1) monopole_spectrum(MJy/sr) uncertainty(kJy/sr)")
-                        aria_button("Close","close",on_click=lambda:plank.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                        
-                        
-                
-                        
+                    # 1. CURIOSITY DIALOG (Viola)
                     with ui.dialog() as cur_planck, ui.card().classes('p-4 w-full max-w-[600px]').props('aria-label="The Big Bang on Your TV" role=dialog aria-modal=true'):
                         html_info_box(r"""
                         <h3>The Big Bang on Your TV</h3>
@@ -419,110 +412,110 @@ def create_page():
                         <p>You were literally watching the afterglow of the Big Bang interacting with your TV antenna!</p>
                         """)
                         reference_box("**Source:** [Forbes](https://www.forbes.com/sites/startswithabang/2019/11/13/this-is-how-your-old-television-set-can-prove-the-big-bang/)")
-                        aria_button("Close", "close", on_click=lambda:cur_planck.close()).classes("!bg-orange-500 text-white font-bold py-2 px-4 rounded")
+                        aria_button("Close", "close", on_click=lambda:cur_planck.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
 
-                   
-                    
-                    with ui.dialog().props('aria-modal="true" role="dialog" aria-labelledby="planck-info-title" aria-describedby="planck-info-content"') as info_dlg, ui.card().classes('p-4 w-full max-w-[800px] overflow-x-auto'):
-                        ui.label("Information").classes("text-lg font-semibold text-blue-400").props("id=planck-info-title role=heading aria-level=2 tabindex=0")
-    
+                    # 2. INSTRUCTIONS DIALOG (Blu - Include anche le vecchie Comparison Instructions di 'temp')
+                    with ui.dialog().props('aria-modal="true" role="dialog"') as info_dlg, ui.card().classes('p-4 w-full max-w-[800px] overflow-x-auto'):
+                        ui.label("Instructions").classes("text-xl font-bold text-blue-800")
                         html_info_box(r"""
-        
-        <h3>Activity Instructions</h3>
-        <p>In this activity, you will determine the present-day temperature (<span class="math">\(T_0\)</span>) of the Cosmic Microwave Background:</p>
-        <ol class="list-decimal ml-4 space-y-2">
-            <li>
-                <b>Generate Theoretical Curves:</b> Use Planck's Law to calculate and plot radiation intensity vs. wavelength for different peak temperatures (e.g., 3000 K, 5000 K).
-            </li>
-            <li>
-               <b>Compare with Observations:</b> Overlay your theoretical curves with the real COBE/FIRAS dataset (blue points) representing the CMB spectrum.
-            </li>
-            <li>
-                <b>Analyze the Peak:</b> Observe that higher temperatures shift the peak to shorter wavelengths (left) and increase intensity.Verify this using Wien's Displacement Law.
-            </li>
-            <li>
-                <b>Find the Match:</b> Adjust the temperature in your simulation until the theoretical curve perfectly overlaps the observed data. The temperature that fits the data is the current temperature of the Universe, <span class="math">\(T_0 \approx 2.725\)</span> K.
-            </li>
-        </ol>
-         <hr class="my-4">
-        <h3>Planck’s Law and Blackbody Radiation</h3>
-        <p>Planck’s law describes the spectral radiance of an ideal blackbody:</p>
-        
-        <div style="text-align:center; margin: 15px 0;">
-            $$B_\lambda(\lambda, T) = \frac{2 h c^2}{\lambda^5} \frac{1}{e^{hc/(\lambda k_B T)} - 1}$$
-        </div>
-
-        <p><strong>where:</strong></p>
-        <ul>
-            <li><span class="math">\(B_\lambda\)</span> = spectral radiance [W·m⁻²·sr⁻¹·m⁻¹]</li>
-            <li><span class="math">\(h\)</span> = Planck constant = <span class="math">\(6.626\times10^{-34}\)</span> J·s</li>
-            <li><span class="math">\(c\)</span> = speed of light = <span class="math">\(2.998\times10^{8}\)</span> m/s</li>
-            <li><span class="math">\(k_B\)</span> = Boltzmann constant = <span class="math">\(1.381\times10^{-23}\)</span> J/K</li>
-        </ul>
-
-        <p>The distribution peaks at a wavelength inversely proportional to T:</p>
-        <div style="text-align:center; margin: 10px 0;">
-            $$\lambda_{max} T = b$$
-        </div>
-        <p>with <span class="math">\(b = 2.897771955\times10^{-3}\)</span> m·K.</p>
-
-        <p>The COBE/FIRAS measurement confirmed the CMB blackbody at T ≈ 2.725 K.</p>
-
-       
-
-    """).props("id=planck-info-content role=document aria-live=polite")
-
+                        <h3>Activity Instructions</h3>
+                        <p>In this activity, you will determine the present-day temperature (<span class="math">\(T_0\)</span>) of the Cosmic Microwave Background:</p>
+                        <ol class="list-decimal ml-4 space-y-2">
+                            <li><b>Generate Theoretical Curves:</b> Use Planck's Law to calculate and plot radiation intensity vs. wavelength for different peak temperatures.</li>
+                            <li><b>Compare with Observations:</b> Overlay your theoretical curves with the real COBE/FIRAS dataset (blue points).</li>
+                            <li><b>Analyze the Peak:</b> Observe that higher temperatures shift the peak to shorter wavelengths and increase intensity. Verify this using Wien's Displacement Law.</li>
+                            <li><b>Find the Match:</b> Adjust the temperature in your simulation until the theoretical curve perfectly overlaps the observed data to find <span class="math">\(T_0 \approx 2.725\)</span> K.</li>
+                        </ol>
+                        <hr style="margin: 15px 0; border-top: 1px solid #0284c7;">
+                        <h3>Comparison Instructions (Exercise)</h3>
+                        <p>Compare theoretical blackbody curves at different temperatures with the COBE/FIRAS CMB spectrum.</p>
+                        <ul>
+                            <li>Select or enter a temperature, then build a table of wavelength–intensity pairs.</li>
+                            <li>Make sure to use wavelengths in meters and intensities in compatible units.</li>
+                            <li>Click <b>'Generate Plot'</b> to overlay your theoretical curve on the COBE data.</li>
+                        </ul>
+                        """)
                         aria_button("Close","close",on_click=lambda:info_dlg.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
 
-
-
-                    
-                    with ui.dialog().props('aria-modal="true" role="dialog" aria-labelledby="planck-legend-title" aria-describedby="planck-legend-content"') as legend_dlg, ui.card().classes('p-4 w-full max-w-[800px] overflow-x-auto'):
-                        ui.label("Legend").classes("text-lg font-semibold text-blue-400").props("id=planck-legend-title role=heading aria-level=2 tabindex=0")
-    
-                        html_info_box(r"""
-        <h3>Symbols and Units</h3>
-        <ul>
-            <li><b>λ</b> = wavelength [m]</li>
-            <li><b>ν</b> = frequency [Hz]</li>
-            <li><b>Bλ</b> = spectral radiance [W·m⁻²·sr⁻¹·m⁻¹]</li>
-            <li><b>T</b> = absolute temperature [K]</li>
-            <li><b>h</b> = Planck constant = <span class="math">\( 6.626\times10^{-34} \)</span> J·s</li>
-            <li><b>c</b> = speed of light = <span class="math">\( 2.998\times10^{8} \)</span> m/s</li>
-            <li><b>kB</b> = Boltzmann constant = <span class="math">\( 1.381\times10^{-23} \)</span> J/K</li>
-            <li><b>b</b> = Wien constant = <span class="math">\( 2.898\times10^{-3} \)</span> m·K</li>
-            <li><b>I</b> = intensity [W·m⁻²·sr⁻¹·m⁻¹]</li>
-            <li><b>z</b> = redshift (dimensionless)</li>
-        </ul>
-    """).props("id=planck-legend-content role=document aria-live=polite")
-
-                        aria_button("Close","close",on_click=lambda:legend_dlg.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-
-
-
-                
-                    with ui.dialog() as temp, ui.card().classes('p-4 w-full max-w-[800px] overflow-x-auto').props('aria-label="Comparison instructions" role=dialog aria-modal=true'):
-                        html_info_box(r"""
-        <h3>Comparison Instructions</h3>
-        <p>Compare theoretical blackbody curves at different temperatures with the COBE/FIRAS CMB spectrum.</p>
-        <ul>
-            <li>Select or enter a temperature, then build a table of wavelength–intensity pairs.</li>
-            <li>Make sure to use wavelengths in meters and intensities in compatible units.</li>
-            <li>Click <b>'Generate Plot'</b> to overlay your theoretical curve on the COBE data.</li>
-        </ul>
-        
-        <hr style="margin: 15px 0; border-top: 1px solid #0284c7;">
-        
-        <h4>Interactive Blackbody Calculators</h4>
-        <ul>
-            <li><a href="https://www.opticsthewebsite.com/OpticsCalculators" target="_blank" style="color:#0284c7; text-decoration:underline;">OpticsTheWebsite</a></li>
-            <li><a href="https://ncc.nesdis.noaa.gov/Planck.php" target="_blank" style="color:#0284c7; text-decoration:underline;">NOAA Planck Calculator</a></li>
-            <li><a href="https://www.bodkindesign.com/reference-library/blackbody-spectral-radiance-calculator/" target="_blank" style="color:#0284c7; text-decoration:underline;">Bodkin Design Blackbody Calculator</a></li>
-            <li><a href="https://spectralcalc.com/blackbody_calculator/blackbody.php" target="_blank" style="color:#0284c7; text-decoration:underline;">SpectralCalc Blackbody Tool</a></li>
-        </ul>
-    """)
-                        aria_button("Close","close",on_click=lambda:temp.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                    
+                    # 3. INFO A SCHEDE (Blu - Include Teoria, Legenda, Dataset e i Calcolatori di 'temp')
+                    def open_info_dialog_planck():
+                        with ui.dialog() as d, ui.card().classes('p-0 w-full max-w-[1000px] h-[80vh] overflow-hidden').props('role=dialog aria-modal=true'):
+                            with ui.column().classes('w-full h-full bg-white flex flex-col'):
+                                with ui.row().classes('w-full justify-between items-center bg-slate-900 text-white p-4 shrink-0'):
+                                    ui.label('Planck Spectrum Scientific Info').classes('text-xl font-bold')
+                                    aria_button('Close', 'close', on_click=d.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                                
+                                with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as tabs:
+                                    t_theory = ui.tab('Theory & Math')
+                                    t_data = ui.tab('Dataset & Tools')
+                                    t_legend = ui.tab('Legend')
+                                    tabs.on_value_change(lambda: ui.run_javascript("setTimeout(() => { if(typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 100)"))
+                                
+                                with ui.tab_panels(tabs, value=t_theory).classes('w-full flex-1 overflow-y-auto bg-gray-50 text-slate-900 p-6'):
+                                    
+                                    with ui.tab_panel(t_theory):
+                                        html_info_box(r"""
+                                        <h3>Planck’s Law and Blackbody Radiation</h3>
+                                        <p>Planck’s law describes the spectral radiance of an ideal blackbody:</p>
+                                        <div style="text-align:center; margin: 15px 0;">
+                                            $$B_\lambda(\lambda, T) = \frac{2 h c^2}{\lambda^5} \frac{1}{e^{hc/(\lambda k_B T)} - 1}$$
+                                        </div>
+                                        <p><strong>where:</strong></p>
+                                        <ul>
+                                            <li><span class="math">\(B_\lambda\)</span> = spectral radiance [W·m⁻²·sr⁻¹·m⁻¹]</li>
+                                            <li><span class="math">\(h\)</span> = Planck constant = <span class="math">\(6.626\times10^{-34}\)</span> J·s</li>
+                                            <li><span class="math">\(c\)</span> = speed of light = <span class="math">\(2.998\times10^{8}\)</span> m/s</li>
+                                            <li><span class="math">\(k_B\)</span> = Boltzmann constant = <span class="math">\(1.381\times10^{-23}\)</span> J/K</li>
+                                        </ul>
+                                        <p>The distribution peaks at a wavelength inversely proportional to T:</p>
+                                        <div style="text-align:center; margin: 10px 0;">
+                                            $$\lambda_{max} T = b$$
+                                        </div>
+                                        <p>with <span class="math">\(b = 2.897771955\times10^{-3}\)</span> m·K.</p>
+                                        <p>The COBE/FIRAS measurement confirmed the CMB blackbody at T ≈ 2.725 K.</p>
+                                        """)
+                                        
+                                    with ui.tab_panel(t_data):
+                                        reference_box("""**Dataset reference**: Fixsen et al. (1996), The Astrophysical Journal. [COBE-FIRAS monopole spetrum](https://lambda.gsfc.nasa.gov/product/cobe/firas_monopole_spect.html)""")
+                                        info_box("**Dataset**: frequency(cm^-1) monopole_spectrum(MJy/sr) uncertainty(kJy/sr)")
+                                        
+                                        template_url_planck = "https://docs.google.com/spreadsheets/d/1lZUAfR0X7bJdtPrAIc3Sz8nbi4zBX1CO5jYJXilAJUY/copy"
+                                     
+                                        with ui.row().classes('w-full justify-center gap-4 mt-4'):
+                                            aria_button('Build Google Sheet', 'Create copy Google Sheet', 
+                                                on_click=lambda: ui.run_javascript(f'window.open("{template_url_planck}", "_blank")')) \
+                                                .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                            aria_button('Download Dataset', 'download dataset', 
+                                                on_click=lambda: ui.run_javascript('window.location.href = "/dataset/cobe_firas_monopole.xlsx"')) \
+                                                .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                        
+                                        html_info_box(r"""
+                                        <h4>Interactive Blackbody Calculators</h4>
+                                        <ul>
+                                            <li><a href="https://www.opticsthewebsite.com/OpticsCalculators" target="_blank" style="color:#0284c7; text-decoration:underline;">OpticsTheWebsite</a></li>
+                                            <li><a href="https://ncc.nesdis.noaa.gov/Planck.php" target="_blank" style="color:#0284c7; text-decoration:underline;">NOAA Planck Calculator</a></li>
+                                            <li><a href="https://www.bodkindesign.com/reference-library/blackbody-spectral-radiance-calculator/" target="_blank" style="color:#0284c7; text-decoration:underline;">Bodkin Design Blackbody Calculator</a></li>
+                                            <li><a href="https://spectralcalc.com/blackbody_calculator/blackbody.php" target="_blank" style="color:#0284c7; text-decoration:underline;">SpectralCalc Blackbody Tool</a></li>
+                                        </ul>
+                                        """)
+                                        
+                                    with ui.tab_panel(t_legend):
+                                        html_info_box(r"""
+                                        <h3>Symbols and Units</h3>
+                                        <ul>
+                                            <li><b>λ</b> = wavelength [m]</li>
+                                            <li><b>ν</b> = frequency [Hz]</li>
+                                            <li><b>Bλ</b> = spectral radiance [W·m⁻²·sr⁻¹·m⁻¹]</li>
+                                            <li><b>T</b> = absolute temperature [K]</li>
+                                            <li><b>h</b> = Planck constant = <span class="math">\( 6.626\times10^{-34} \)</span> J·s</li>
+                                            <li><b>c</b> = speed of light = <span class="math">\( 2.998\times10^{8} \)</span> m/s</li>
+                                            <li><b>kB</b> = Boltzmann constant = <span class="math">\( 1.381\times10^{-23} \)</span> J/K</li>
+                                            <li><b>b</b> = Wien constant = <span class="math">\( 2.898\times10^{-3} \)</span> m·K</li>
+                                            <li><b>I</b> = intensity [W·m⁻²·sr⁻¹·m⁻¹]</li>
+                                            <li><b>z</b> = redshift (dimensionless)</li>
+                                        </ul>
+                                        """)
+                        d.open()
                     @ui.refreshable
                     def draw_plot():
                 
@@ -659,20 +652,12 @@ def create_page():
                             rows=[]
                         ).classes('w-full').props('role=table tabindex=0 aria-label="Generated spectrum table"')
                         aria_button("Close","close",on_click=lambda:gen_data_dlg.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                    with ui.row().classes("w-full justify-center items-center gap-2"):
+                    with ui.row().classes("w-full justify-center items-center gap-4 mt-4"):
+                        aria_button("Instructions", "Information", on_click=lambda:[info_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                        aria_button("Info", "Detailed Information", on_click=lambda:[open_info_dialog_planck(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                        aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_planck.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md")
                         
-                        aria_button("Instructions ", "Information",on_click=lambda:[info_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
-                        aria_button("Dataset","dataset",on_click=lambda:[plank.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
-                        aria_button("Legend ", "Variable and constants legend",on_click=lambda:[legend_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
-                        aria_button("CMB spectrum exercise","CMB spectrum exercise",on_click=lambda:[temp.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-                        aria_button("Wien law","Wien law",on_click=lambda:[wien.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
-                        aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_planck.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded")
-                    
-
-                        
-
-                        
-                    
+                        aria_button("Wien Law", "Wien law", on_click=lambda:[wien.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
             
                     
                     with ui.row().classes('w-full justify-center items-center gap-8'):
@@ -875,9 +860,9 @@ def create_page():
                 z_grid = np.linspace(max(0, z_min * 0.98), z_max * 1.02, 400)
 
                 with container:
-                    description_on_dark(
+                    ui.label(
     "Analyze the thermodynamics of the expanding Universe to understand how it cooled down from a hot plasma to the transparent cosmos we see today."
-)
+).classes('font-bold text-3xl text-blue-100 mt-4 drop-shadow-md text-center whitespace-pre-wrap w-full').props('role=heading aria-level=2 tabindex=0')
                     with ui.dialog() as info_dlg, ui.card().classes('p-4 w-full overflow-x-auto').props('aria-label="CMB thermodynamics activity instructions" role=dialog aria-modal=true'):
                         html_info_box(r"""
  
@@ -918,62 +903,53 @@ def create_page():
 
                
                     
-                    with ui.dialog() as ref_dialog, ui.card().classes('p-4 w-full overflow-x-auto').props('aria-label="Reference data for CMB analysis" role=dialog aria-modal=true'):
-                        info_box(
-                        
-                        "**Dataset**: Redshift (z), CMB Temperature (K), T/z+1, T_error"
-                    )
-                        reference_box(
-                        """**Dataset reference**: Riechers et al. 2022, *Nature*, 'Microwave background temperature at a redshift of 6.34 from H2O absorption'."""
-                    )
-                        aria_button("Close","close",on_click=lambda:ref_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                    
-                    with ui.dialog() as thermo_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto'):
-                        html_info_box(r"""
+                    def open_info_dialog_cmb():
+                        with ui.dialog() as d, ui.card().classes('p-0 w-full max-w-[1200px] h-[85vh] overflow-hidden').props('role=dialog aria-modal=true'):
+                            with ui.column().classes('w-full h-full bg-white flex flex-col'):
+                                with ui.row().classes('w-full justify-between items-center bg-slate-900 text-white p-4 shrink-0'):
+                                    ui.label('Adiabatic Index Info').classes('text-xl font-bold')
+                                    aria_button('Close', 'close', on_click=d.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                                with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as tabs:
+                                    t_dataset = ui.tab('Dataset')
+                                    t_thermo = ui.tab('Thermodynamics')
+                                    t_legend = ui.tab('Legend')
+                                    tabs.on_value_change(lambda: ui.run_javascript("setTimeout(() => { if(typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 100)"))
+                                with ui.tab_panels(tabs, value=t_dataset).classes('w-full flex-1 overflow-y-auto bg-gray-50 text-slate-900 p-6'):
+                                    with ui.tab_panel(t_dataset):
+                                        info_box("**Dataset**: Redshift (z), CMB Temperature (K), T/z+1, T_error")
+                                        reference_box("""**Dataset reference**: Riechers et al. 2022, *Nature*, 'Microwave background temperature at a redshift of 6.34 from H2O absorption'.""")
+                                        
+                                        template_url_cmb = "https://docs.google.com/spreadsheets/d/1THlih56LfC1TugS--4wYtXYxOOjsEXT6VpkkaAXF6xs/copy"
+                                    
+                                        with ui.row().classes('w-full justify-center gap-4 mt-4'):
+                                            aria_button('Build Google Sheet', 'Create copy Google Sheet', 
+                                                on_click=lambda: ui.run_javascript(f'window.open("{template_url_cmb}", "_blank")')) \
+                                                .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                            aria_button('Download Dataset', 'download dataset', 
+                                                on_click=lambda: ui.run_javascript('window.location.href = "/dataset/dataset_CMB.xlsx"')) \
+                                                .classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-2 px-4 rounded shadow-md')
+                                        html_info_box(r"""
                             <h3>Thermodynamics and Adiabatic Transformations</h3>
-
                             <p>Imagine the large-scale Universe as an isolated, closed system — it does not exchange heat or energy with any 'outside'. Its total internal energy can be approximated as conserved over time. In this context, the early Universe was hot, dense, and dominated by photon radiation. The cosmic microwave background (CMB) discovered by Penzias and Wilson is the remnant of that radiation, now cooled to about 2.725 K. Its spectrum is an almost perfect blackbody, and its temperature has decreased with the expansion of the Universe.</p>
-
                             <p>The expansion behaves as an <b>adiabatic process</b>: total energy is conserved, the system expands, and the temperature drops as the volume increases.</p>
-                            
-
                             <ul>
-                                <li>
-                                    <b>First Law of Thermodynamics:</b><br>
-                                    <span class="math">\( \Delta U = Q - L \)</span> → <span class="math">\( dQ = dU + P dV \)</span><br>
-                                    → for adiabatic processes <span class="math">\( dQ = 0 \Rightarrow dU + P dV = 0 \)</span>
-                                </li>
-                                
-                                <li>
-                                    <b>For an ideal gas:</b><br>
-                                    <span class="math">\( P V^\gamma = \text{const} \)</span> → <span class="math">\( T V^{\gamma-1} = \text{const} \)</span> → <span class="math">\( T \propto V^{1-\gamma} \)</span>
-                                </li>
+                                <li><b>First Law of Thermodynamics:</b><br><span class="math">\( \Delta U = Q - L \)</span> → <span class="math">\( dQ = dU + P dV \)</span><br>→ for adiabatic processes <span class="math">\( dQ = 0 \Rightarrow dU + P dV = 0 \)</span></li>
+                                <li><b>For an ideal gas:</b><br><span class="math">\( P V^\gamma = \text{const} \)</span> → <span class="math">\( T V^{\gamma-1} = \text{const} \)</span> → <span class="math">\( T \propto V^{1-\gamma} \)</span></li>
                             </ul>
-
                             <p>The adiabatic index <span class="math">\( \gamma = C_p / C_v \)</span> depends on the degrees of freedom of the gas (equipartition of energy):</p>
                             <ul>
                                 <li>Monatomic gas: <span class="math">\( \gamma = 5/3 \)</span></li>
                                 <li>Diatomic gas: <span class="math">\( \gamma = 7/5 \)</span></li>
                                 <li>Polyatomic (photon gas): <span class="math">\( \gamma = 4/3 \)</span></li>
                             </ul>
-
                             <h4>In Cosmology</h4>
                             <p>Using the Stefan–Boltzmann law for radiation energy density, <span class="math">\( u = \alpha_{\rm rad} T^4 \)</span> with <span class="math">\( \alpha_{\rm rad} = 4\sigma/c \approx 7.56\times10^{-16} \, \rm J \, m^{-3} K^{-4} \)</span>, and <span class="math">\( P = u/3 \)</span>,</p>
-                            
                             <p>we obtain <span class="math">\( \frac{1}{T} \frac{dT}{dt} = -\frac{1}{3V} \frac{dV}{dt} \)</span>. With the scale factor <span class="math">\( a(t) \)</span>, since <span class="math">\( V \propto a^3 \)</span>, we get <span class="math">\( T \propto a^{-1} \)</span>.</p>
-                            
                             <p>Because redshift relates to the scale factor as <span class="math">\( 1+z = 1/a \)</span>, we have <span class="math">\( T(z) \propto (1+z) \)</span>.</p>
-                            
                             <p>In general form, for any <span class="math">\( \gamma \)</span>: <span class="math">\( T(z) = T_0 (1+z)^{3(\gamma-1)} \)</span>.</p>
-                        """).props('tabindex=0 role=document aria-label="Thermodynamics and Adiabatic Transformations information"')
-                        aria_button("Close", label="Close the box", on_click=lambda: thermo_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-
-                            
-
-
-                        
-                    with ui.dialog() as legend_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto'):
-                        html_info_box(r"""
+                                        """)
+                                    with ui.tab_panel(t_legend):
+                                        html_info_box(r"""
         <h3>Legend: Symbols and Units</h3>
         <ul>
             <li><b>T</b> = Temperature [K]</li>
@@ -989,25 +965,17 @@ def create_page():
             <li><b>λ_obs, λ_em</b> = Observed / Emitted wavelength [m]</li>
             <li><b>a(t)</b> = Scale factor (dimensionless)</li>
         </ul>
-    """).props('tabindex=0 role=document aria-label="Legend of variables and constants used in the exercise"')
-
-                        aria_button("Close", label="Close the box", on_click=lambda: legend_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                                        """)
+                        d.open()
                     with ui.row().classes("w-full justify-center gap-1 "):
 
                 
                         with ui.column().classes("flex-1"):
 
-                            with ui.row().classes("justify-center gap-1 w-full"):
-                                aria_button("Instructions","instruction",on_click=lambda:[info_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                                aria_button("Dataset","dataset",on_click=lambda:[ref_dialog.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                                aria_button(                            "Info Thermodynamics",
-                                "Read detailed information about thermodynamics and adiabatic transformations",
-                                on_click=lambda:    [                             thermo_dialog.open() ,ui.run_javascript("MathJax.typesetPromise()") ]                      ).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                                aria_button(                            "Legend","Open legend of symbols and units",
-                                on_click=lambda: [
-                                    legend_dialog.open()                     ,ui.run_javascript("MathJax.typesetPromise()")]      
-                            ).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                                aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_adia.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded")
+                            with ui.row().classes("justify-center gap-4 w-full mt-4"):
+                                aria_button("Instructions", "instruction", on_click=lambda:[info_dlg.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                                aria_button("Info", "Detailed info", on_click=lambda:[open_info_dialog_cmb(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                                aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_adia.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md")
                             with ui.row().classes("justify-center gap-1 w-full"):
                                 T0_input = ui.number(value=T0_default, label="T₀ [K] (present-day)", format="%.6g") \
                                 .props('aria-label="Present-day CMB temperature input in Kelvin"')
@@ -1413,9 +1381,9 @@ def create_page():
                 {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 
                 with container:
-                    description_on_dark(
+                    ui.label(
     "Compare the evolution of matter and radiation densities to identify the key transition epochs in the history of the Universe."
-)
+).classes('font-bold text-3xl text-blue-100 mt-4 drop-shadow-md text-center whitespace-pre-wrap w-full').props('role=heading aria-level=2 tabindex=0')
                     with ui.dialog() as i_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto'):
                         html_info_box(r"""
     
@@ -1438,34 +1406,7 @@ def create_page():
 """).props("id=equivalence-info role=document aria-live=polite")
                         aria_button("Close", label="Close the box", on_click=lambda: i_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
 
-                    with ui.dialog() as eq_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto'):
-                        html_info_box(r"""
-        <h3>Equivalence between Matter and Radiation Densities</h3>
-
-        <p>After the Big Bang, the Universe passed through three main eras:</p>
-        <ul>
-            <li><b>Radiation-dominated epoch:</b> <span class="math">\( \rho_r > \rho_m \)</span></li>
-            <li><b>Matter–radiation equality:</b> <span class="math">\( \rho_r = \rho_m \)</span></li>
-            <li><b>Matter-dominated epoch:</b> <span class="math">\( \rho_m > \rho_r \)</span></li>
-        </ul>
-        
-
-
-
-        <p>During the cosmic expansion, the density of matter decreases as <span class="math">\( a^{-3} \)</span>, while radiation decreases faster <span class="math">\( a^{-4} \)</span> since photons lose energy by redshifting (<span class="math">\( \lambda \propto a \Rightarrow E \propto 1/a \)</span>).</p>
-
-        <p>From classical physics:</p>
-        <ul>
-            <li><b>Non-relativistic matter:</b> <span class="math">\( E \approx mc^2 \Rightarrow \rho_m \propto a^{-3} \)</span></li>
-            <li><b>Radiation:</b> <span class="math">\( E_\gamma = h\nu = hc/\lambda \Rightarrow \rho_r \propto a^{-4} \)</span></li>
-            <li>Using Stefan–Boltzmann law <span class="math">\( \rho_r = \alpha_{\rm rad} T^4 \)</span> and adiabatic expansion <span class="math">\( T \propto 1/a \)</span>, we again get <span class="math">\( \rho_r \propto a^{-4} \)</span></li>
-        </ul>
-
-        <p>The equality redshift <span class="math">\( z_{\rm eq} \)</span> satisfies <span class="math">\( \rho_m(z_{\rm eq}) = \rho_r(z_{\rm eq}) \)</span>.</p>
-    """).props('tabindex=0 role=document aria-label="Equivalence between matter and radiation densities information"')
-
-                        aria_button("Close", label="Close the box", on_click=lambda: eq_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-
+                    
                     
                     with ui.dialog() as cur_rad, ui.card().classes('p-4 w-full max-w-[600px]').props("id=goldilocks-info role=document aria-live=polite"):
                         html_info_box(r"""
@@ -1478,27 +1419,55 @@ def create_page():
 
                     
 
-                    with ui.dialog() as eq_legend_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props("id=legend-info role=document aria-live=polite"):
-                        html_info_box(r"""
-        <h3>Legend: Symbols and Constants</h3>
-        <ul>
-            <li><b>ρ_m, ρ_r</b> = matter / radiation energy density [kg·m⁻³]</li>
-            <li><b>Ω_m₀, Ω_r₀</b> = present-day density parameters (dimensionless)</li>
-            <li><b>ρ_c</b> = critical density = <span class="math">\( 3 H_0^2 / 8 \pi G \)</span></li>
-            <li><b>H₀</b> = Hubble constant = <span class="math">\( 2.27\times10^{-18} \)</span> s⁻¹</li>
-            <li><b>G</b> = gravitational constant = <span class="math">\( 6.67\times10^{-11} \)</span> m³·kg⁻¹·s⁻²</li>
-            <li><b>T₀</b> = present-day CMB temperature = 2.725 K</li>
-            <li><b>z</b> = redshift (dimensionless)</li>
-            <li><b>a(t)</b> = scale factor = 1/(1+z)</li>
-            <li><b>α_rad</b> = radiation density constant = <span class="math">\( 7.56\times10^{-16} \)</span> J·m⁻³·K⁻⁴</li>
-            <li><b>h</b> = Planck constant = <span class="math">\( 6.626\times10^{-34} \)</span> J·s</li>
-            <li><b>c</b> = speed of light = <span class="math">\( 2.998\times10^{8} \)</span> m/s</li>
-            <li><b>λ</b> = photon wavelength [m]</li>
-            <li><b>ν</b> = photon frequency [Hz]</li>
-        </ul>
-    """).props('tabindex=0 role=document aria-label="Legend of symbols and constants used in the exercise"')
-                        aria_button("Close", label="Close the box", on_click=lambda: eq_legend_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                    
+                    def open_info_dialog_radmat():
+                            with ui.dialog() as d, ui.card().classes('p-0 w-full max-w-[1200px] h-[85vh] overflow-hidden').props('role=dialog aria-modal=true'):
+                                with ui.column().classes('w-full h-full bg-white flex flex-col'):
+                                    with ui.row().classes('w-full justify-between items-center bg-slate-900 text-white p-4 shrink-0'):
+                                        ui.label('Matter-Radiation Info').classes('text-xl font-bold')
+                                        aria_button('Close', 'close', on_click=d.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                                    with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as tabs:
+                                        t_matter = ui.tab('Matter-Radiation Equivalence')
+                                        t_legend = ui.tab('Legend')
+                                        tabs.on_value_change(lambda: ui.run_javascript("setTimeout(() => { if(typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 100)"))
+                                    with ui.tab_panels(tabs, value=t_matter).classes('w-full flex-1 overflow-y-auto bg-gray-50 text-slate-900 p-6'):
+                                        with ui.tab_panel(t_matter):
+                                            html_info_box(r"""
+            <h3>Equivalence between Matter and Radiation Densities</h3>
+            <p>After the Big Bang, the Universe passed through three main eras:</p>
+            <ul>
+                <li><b>Radiation-dominated epoch:</b> <span class="math">\( \rho_r > \rho_m \)</span></li>
+                <li><b>Matter–radiation equality:</b> <span class="math">\( \rho_r = \rho_m \)</span></li>
+                <li><b>Matter-dominated epoch:</b> <span class="math">\( \rho_m > \rho_r \)</span></li>
+            </ul>
+            <p>During the cosmic expansion, the density of matter decreases as <span class="math">\( a^{-3} \)</span>, while radiation decreases faster <span class="math">\( a^{-4} \)</span> since photons lose energy by redshifting (<span class="math">\( \lambda \propto a \Rightarrow E \propto 1/a \)</span>).</p>
+            <p>From classical physics:</p>
+            <ul>
+                <li><b>Non-relativistic matter:</b> <span class="math">\( E \approx mc^2 \Rightarrow \rho_m \propto a^{-3} \)</span></li>
+                <li><b>Radiation:</b> <span class="math">\( E_\gamma = h\nu = hc/\lambda \Rightarrow \rho_r \propto a^{-4} \)</span></li>
+                <li>Using Stefan–Boltzmann law <span class="math">\( \rho_r = \alpha_{\rm rad} T^4 \)</span> and adiabatic expansion <span class="math">\( T \propto 1/a \)</span>, we again get <span class="math">\( \rho_r \propto a^{-4} \)</span></li>
+            </ul>
+            <p>The equality redshift <span class="math">\( z_{\rm eq} \)</span> satisfies <span class="math">\( \rho_m(z_{\rm eq}) = \rho_r(z_{\rm eq}) \)</span>.</p>
+                                            """)
+                                        with ui.tab_panel(t_legend):
+                                            html_info_box(r"""
+            <h3>Legend: Symbols and Constants</h3>
+            <ul>
+                <li><b>ρ_m, ρ_r</b> = matter / radiation energy density [kg·m⁻³]</li>
+                <li><b>Ω_m₀, Ω_r₀</b> = present-day density parameters (dimensionless)</li>
+                <li><b>ρ_c</b> = critical density = <span class="math">\( 3 H_0^2 / 8 \pi G \)</span></li>
+                <li><b>H₀</b> = Hubble constant = <span class="math">\( 2.27\times10^{-18} \)</span> s⁻¹</li>
+                <li><b>G</b> = gravitational constant = <span class="math">\( 6.67\times10^{-11} \)</span> m³·kg⁻¹·s⁻²</li>
+                <li><b>T₀</b> = present-day CMB temperature = 2.725 K</li>
+                <li><b>z</b> = redshift (dimensionless)</li>
+                <li><b>a(t)</b> = scale factor = 1/(1+z)</li>
+                <li><b>α_rad</b> = radiation density constant = <span class="math">\( 7.56\times10^{-16} \)</span> J·m⁻³·K⁻⁴</li>
+                <li><b>h</b> = Planck constant = <span class="math">\( 6.626\times10^{-34} \)</span> J·s</li>
+                <li><b>c</b> = speed of light = <span class="math">\( 2.998\times10^{8} \)</span> m/s</li>
+                <li><b>λ</b> = photon wavelength [m]</li>
+                <li><b>ν</b> = photon frequency [Hz]</li>
+            </ul>
+                                            """)
+                            d.open()
                     ui.add_head_html('''
     <style>
  
@@ -1729,26 +1698,12 @@ def create_page():
                         with ui.column().classes("flex-1 justify-start !bg-gray-900 p-4 rounded-xl shadow-lg"):
 
                 
-                            with ui.row().classes("justify-center w-full gap-2 flex-wrap"):
-                                aria_button("Instructions","instruction",on_click=lambda:[i_dialog.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                                aria_button(
-                                        "Info: Matter-Radiation",
-                                        "Read detailed information about matter-radiation equivalence",
-                                        on_click=lambda: [
-                                            eq_dialog.open(),
-                                            ui.run_javascript("MathJax.typesetPromise()")
-                                        ]
-                                    ).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                                aria_button(
-                                        "Legend",
-                                        "Open legend of symbols and constants",
-                                        on_click=lambda: [
-                                            eq_legend_dialog.open(),
-                                            ui.run_javascript("MathJax.typesetPromise()")
-                                        ]
-                                    ).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded ")
-                                generate_plot_btn = aria_button("Generate Plot", "Plot densities").classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded ")
-                                aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_rad.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded")
+                            with ui.row().classes("justify-center w-full gap-4 flex-wrap mt-4"):
+                                aria_button("Instructions", "instruction", on_click=lambda:[i_dialog.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                                aria_button("Info", "Detailed info", on_click=lambda: [open_info_dialog_radmat(), ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                                aria_button("Curiosity", "Open curiosity", on_click=lambda:[cur_rad.open(),ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-purple-600 hover:!bg-purple-800 text-white font-bold py-2 px-4 rounded shadow-md")
+                                
+                                generate_plot_btn = aria_button("Generate Plot", "Plot densities").classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded shadow-md")
                             with ui.row().classes("w-full justify-center items-center gap-12 flex-wrap"):
 
     

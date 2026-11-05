@@ -76,7 +76,7 @@ core.load_data()
 core.download_submissions_from_cloud()
 
 
-MODULES_LOCKED = os.getenv("MODULES_LOCKED", "True") == "True"
+#MODULES_LOCKED = os.getenv("MODULES_LOCKED", "True") == "True"
 app.add_static_files('/images', os.path.join(BASE_DIR, 'images'))
 app.add_static_files('/dataset', os.path.join(BASE_DIR, 'dataset'))
 app.add_static_files('/galaxy_img', os.path.join(BASE_DIR, 'galaxy_img'))
@@ -120,7 +120,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         dark=True,
         reconnect_timeout=30.0,
         binding_refresh_interval=0.1,
-        reload=False, 
+        reload=True, 
         show=True    
     )
 '''
