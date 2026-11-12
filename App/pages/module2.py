@@ -204,15 +204,15 @@ def create_page():
     #function for cluster
         
 
-    def comoving_distance_Mpc(z, H0=70.0, Om=0.3):
+    def comoving_distance_Mpc(z, H0=73.0, Om=0.315):
         integrand = lambda zp: 1.0 / np.sqrt(Om*(1.0+zp)**3 + (1.0-Om))
         chi, _ = quad(integrand, 0.0, z)
         return (c_light / H0) * chi  # Mpc
 
-    def angular_diameter_distance_Mpc(z, H0=70.0, Om=0.3):
+    def angular_diameter_distance_Mpc(z, H0=73.0, Om=0.315):
         return comoving_distance_Mpc(z, H0, Om) / (1.0 + z)
 
-    def rho_crit_Msunkpc3(H0=70.0):
+    def rho_crit_Msunkpc3(H0=73.0):
         # H0 [km/s/Mpc] -> km/s/kpc
         H0_kpc = H0 / 1000.0
         return 3.0 * (H0_kpc**2) / (8.0 * np.pi * G_grav)  # Msun / kpc^3
@@ -416,7 +416,7 @@ def create_page():
         mag_corrected = app_mag_r - extinction_r
         
 
-        H0_kmsMpc = 70.0
+        H0_kmsMpc = 73.0
         D_L_Mpc = (c_light * z) / H0_kmsMpc
         dist_mod = 5 * np.log10(D_L_Mpc * 1e6) - 5
         
@@ -432,7 +432,7 @@ def create_page():
 
     from scipy.special import sici
 
-    def calculate_sigma_los_nfw(R_proj, M200, c, z_cluster, H0=70.0):
+    def calculate_sigma_los_nfw(R_proj, M200, c, z_cluster, H0=73.0):
         R_proj = np.asarray(R_proj, dtype=float)
         # Protezione zero mass
         if M200 <= 0:
@@ -4485,10 +4485,10 @@ def create_page():
 
                             <li><b>Step 4: Reduced Chi-Square</b><br>
 
-                            <span class="math">\( \chi^2_{\mathrm{red}} = \frac{\chi^2}{\mathrm{dof}} \)</span><br>
+                           
 
-                            Finally, we divide the total sum by the Degrees of Freedom (dof), which relates to the number of bins. By tracking this reduced value, you can find the exact Dark Matter mass where the simulated curve best matches the real universe!</li>
-
+                            <span class="math">\( \chi^2_{\mathrm{red}} = \frac{\chi^2}{N_{\mathrm{bins}} - 2} \)</span><br>
+Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, because we estimate 2 parameters from the data: Mean and Sigma). By tracking this reduced value, you can find the exact Dark Matter mass where the simulated curve best matches the real universe!</li>
                         </ul>
 
                         """).props('role=dialog aria-modal=true aria-label="Chi-Square explanation"')
@@ -4735,7 +4735,7 @@ def create_page():
                                         M_dm_enclosed = np.zeros_like(r_array)
                                     
                                     if current_M_tot > 0:
-                                        sigma_array = calculate_sigma_los_nfw(r_array, current_M_tot, max(c_nfw, 0.1), cluster_state.get('z_cluster', 0.02), 70.0)
+                                        sigma_array = calculate_sigma_los_nfw(r_array, current_M_tot, max(c_nfw, 0.1), cluster_state.get('z_cluster', 0.02), 73.0)
                                     else:
                                         sigma_array = np.zeros_like(r_array)
 
@@ -5076,15 +5076,16 @@ def create_page():
 
                   
                         
-
-                        D_A_kpc = angular_diameter_distance_Mpc(cluster_state['z_cluster']) * 1000.0
+                        cluster_distance_Mpc = np.median(z_arr * c_light) / 73.0
+                        D_A_kpc = cluster_distance_Mpc * 1000.0
+                        #D_A_kpc = angular_diameter_distance_Mpc(cluster_state['z_cluster']) * 1000.0
                         theta_rad = angsep_rad(df_coma['ra'].values, df_coma['dec'].values, cluster_state['center_ra'], cluster_state['center_dec'])
                         r_proj_kpc = np.maximum(theta_rad * D_A_kpc, 1e-3)
                         cluster_state['r_proj_kpc'] = np.maximum(theta_rad * D_A_kpc, 1e-3)
                         cluster_state['x_kpc'] = np.radians(df_coma['ra'].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
                         cluster_state['y_kpc'] = np.radians(df_coma['dec'].values - cluster_state['center_dec']) * D_A_kpc
 
-                        cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=70.0)
+                        cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=73.0)
                         cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(df_coma['modelmag_r'].values, df_coma['extinction_r'].values, cluster_state['z_cluster'])
 
                         #M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
@@ -5155,15 +5156,16 @@ def create_page():
                         idx_bcg = df["bmag"].idxmin()
                         cluster_state['center_ra'] = float(df.loc[idx_bcg, "RAdeg"])
                         cluster_state['center_dec'] = float(df.loc[idx_bcg, "DEdeg"])
-
-                        D_A_kpc = angular_diameter_distance_Mpc(cluster_state['z_cluster']) * 1000.0
+                        cluster_distance_Mpc = np.median(cluster_state['observed_vel']) / 73.0
+                        D_A_kpc = cluster_distance_Mpc * 1000.0
+                        #D_A_kpc = angular_diameter_distance_Mpc(cluster_state['z_cluster']) * 1000.0
                         theta_rad = angsep_rad(df["RAdeg"], df["DEdeg"], cluster_state['center_ra'], cluster_state['center_dec'])
                         
                         cluster_state['r_proj_kpc'] = np.maximum(theta_rad * D_A_kpc, 1e-3)
                         # Converte RA e DEC in offset spaziali fisici (kpc) rispetto al centro
                         cluster_state['x_kpc'] = np.radians(df["RAdeg"].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
                         cluster_state['y_kpc'] = np.radians(df["DEdeg"].values - cluster_state['center_dec']) * D_A_kpc
-                        cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=70.0)
+                        cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=73.0)
 
                         cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(
                             df["bmag"].values,
@@ -5420,10 +5422,25 @@ def create_page():
                             v_center_tot = v_mean_obs
 
                         sigma_fit = np.std(observed_vel)
-                        counts_model = N_obs * (norm.cdf(bins[1:], loc=v_center_tot, scale=sigma_fit) - norm.cdf(bins[:-1], loc=v_center_tot, scale=sigma_fit))
-
-                        chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
-                        chi2_val = chi2_hist / max(1, len(counts_obs))
+                        #counts_model = N_obs * (norm.cdf(bins[1:], loc=v_center_tot, scale=sigma_fit) - norm.cdf(bins[:-1], loc=v_center_tot, scale=sigma_fit))
+                        rng = np.random.default_rng(seed=42)
+                        v_sim_tot = rng.normal(loc=v_center_tot, scale=sigma_fit, size=len(observed_vel))
+                        counts_model, _ = np.histogram(v_sim_tot, bins=bins)
+                        valid_bins = counts_model > 0
+                        if np.sum(valid_bins) > 1:
+                            chi2_raw = np.sum(((counts_obs[valid_bins] - counts_model[valid_bins])**2) / counts_model[valid_bins])
+                            dof = max(1, np.sum(valid_bins) - 2)
+                            chi2_val = float(chi2_raw / dof)
+                        else:
+                            chi2_val = 0.0
+                            
+                        
+                        
+                        
+                        
+                       
+                        #chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
+                        #chi2_val = chi2_hist / max(1, len(counts_obs))
 
                         is_duplicate = any(abs(x - dm_ratio_display) < 1e-4 for x, y in cluster_state['chi2_points'])
                         if is_duplicate:
@@ -5881,11 +5898,17 @@ def create_page():
                 
                         
                         
-                        
+                            valid_bins = counts_model > 0
+                            if np.sum(valid_bins) > 1:
+                                chi2_raw = np.sum(((counts_obs[valid_bins] - counts_model[valid_bins])**2) / counts_model[valid_bins])
+                                dof = max(1, np.sum(valid_bins) - 2)
+                                chi2_norm = chi2_raw / dof
+                            else:
+                                chi2_norm = 0.0
                             #chi2_hist = np.sum(((np.log1p(counts_obs) - np.log1p(counts_model))**2))
-                            chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
+                            #chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
                             #chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0)**2)
-                            chi2_norm = chi2_hist / len(counts_obs)
+                            #chi2_norm = chi2_hist / len(counts_obs)
                             
                             
                             v_mean_val = np.mean(observed_vel)
@@ -6162,7 +6185,7 @@ def create_page():
 
                         df = get_cluster_data_cached(selected_file)
 
-                        H0 = 70.0
+                        H0 = 73.0
                         G = 4.302e-6
                         M_sun_B = 5.48
                         MLR_B = 5.0
@@ -6537,7 +6560,7 @@ def create_page():
 
             <li><b>M<sub>sun,B</sub></b> = 5.48 (absolute magnitude of the Sun in B-band)</li>
 
-            <li><b>H<sub>0</sub></b> = 70 km/s/Mpc (Hubble constant)</li>
+            <li><b>H<sub>0</sub></b> = 73 km/s/Mpc (Hubble constant)</li>
 
             <li><b>G</b> = 4.302 &times; 10<sup>-6</sup> kpc&middot;(km/s)&sup2;&middot;M<sub>&odot;</sub><sup>-1</sup></li>
 
@@ -6856,17 +6879,17 @@ def create_page():
                                         else:
                                             sigma_global = np.std(observed_vel - np.median(observed_vel))
                                             
-                                        rho_crit = rho_crit_Msunkpc3(70.0)
+                                        rho_crit = rho_crit_Msunkpc3(73.0)
                                         M200, R200 = estimate_M200_R200_from_sigma(sigma_global, rho_crit)
                                         M_tot = M200
                                         
                                        
                                         #if M_tot > 5e15 or M_tot < 1e13: continue
 
-                                        cluster_distance = np.median(observed_vel) / 70.0
+                                        cluster_distance = np.median(observed_vel) / 73.0
                                         if is_coma:
                                             z_cluster = np.nanmedian(members['redshift'])
-                                            cluster_distance = (c_light * z_cluster) / 70.0
+                                            cluster_distance = (c_light * z_cluster) / 73.0
                                             dist_mod = 5 * np.log10(cluster_distance * 1e6) - 5
                                             ext_val = members['extinction_r'].values if 'extinction_r' in members.columns else 0.0
                                             M_abs = members[mag_col].values - ext_val - dist_mod
