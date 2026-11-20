@@ -6097,13 +6097,18 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         ui.run_javascript("if (typeof MathJax !== 'undefined') { MathJax.typesetPromise(); }")
                     with ui.row().classes('w-full justify-center '):
                         cluster_files = [f for f in os.listdir(CLUSTER_DATA_PATH) if f.endswith(('.txt', '.dat', '.csv'))]
-                        cluster_file_map = get_data_and_images(CLUSTER_DATA_PATH, CLUSTER_IMG_PATH)
+                        if "Abell1656(Coma).csv" not in cluster_files and os.path.exists(os.path.join(DATA_DIR, "Abell1656(Coma).csv")):
+                            cluster_files.insert(0, "Abell1656(Coma).csv")
 
-                        if not cluster_file_map:
+                        cluster_file_map = get_data_and_images(CLUSTER_DATA_PATH, CLUSTER_IMG_PATH)
+                        coma_img_path = os.path.join(CLUSTER_IMG_PATH, "coma_img.jpg")
+                        if os.path.exists(coma_img_path):
+                            cluster_file_map["Abell1656(Coma).csv"] = coma_img_path
+
+                        if not cluster_files:
                             ui.label("No cluster data files found.").classes('text-red-500')
                         else:
-                        
-                            cluster_select = ui.select(cluster_files, label='Select a Cluster Dataset').classes('flex-1 max-w-md items-start text-lg')
+                            cluster_select = ui.select(cluster_files, value=cluster_files[0], label='Select a Cluster Dataset').classes('flex-1 max-w-md items-start text-lg')
                         aria_button("Instructions", "Read instruction for cluster activities",on_click=safe_click(lambda: [inst_dialog.open(), ui.run_javascript("MathJax.typesetPromise()")])).classes(
         "!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded"
     )
@@ -6307,73 +6312,54 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                     # Calcola massa e percentuale DM per tutti i cluster presenti nel dataset
                                     for file in cluster_files:
                                         df = get_cluster_data_cached(file)
-                                        if df is None or df.empty: continue
-                                        
+                                        if df is None or df.empty:
+                                            continue
+
                                         members = df.copy()
                                         is_coma = "coma" in file.lower()
-                                        
-                                        if is_coma:
-                                            if 'redshift' in members.columns:
-                                                members['RV'] = members['redshift'] * c_light
-                                            mag_col = 'modelmag_r'
-                                        else:
-                                            mag_col = 'bmag'
-                                            
-                                        if 'RV' not in members.columns: continue
-                                            
-                                      
-                                        for _ in range(5):
-                                            v_rel = members["RV"] - np.median(members["RV"])
-                                            mad = np.median(np.abs(v_rel))
-                                            sigma = 1.4826 * mad if mad > 0 else np.std(v_rel)
-                                            mask = np.abs(v_rel) <= 3 * sigma
-                                            new_members = members[mask]
-                                            if len(new_members) == len(members): break
-                                            members = new_members
 
-                                        if len(members) < 5: continue
-                                        
+                                        if is_coma and "RV" not in members.columns and "redshift" in members.columns:
+                                            members["RV"] = members["redshift"] * c_light
+                                        if not is_coma and "bmag" in members.columns:
+                                            members = members[members["bmag"] > 0.0]
+
+                                        if "RV" not in members.columns or len(members) < 5:
+                                            continue
+
+                                        # Filtro galassie membre dentro il singolo cluster (+-6000 km/s + MAD 3-sigma)
+                                        members = filter_cluster_members(members, vel_col="RV")
+                                        if len(members) < 5:
+                                            continue
+
                                         observed_vel = members["RV"].values
-                                        if is_coma:
-                                            sigma_global = np.std(observed_vel)
-                                        else:
-                                            sigma_global = np.std(observed_vel - np.median(observed_vel))
-                                            
-                                        rho_crit = rho_crit_Msunkpc3(73.0)
-                                        M200, R200 = estimate_M200_R200_from_sigma(sigma_global, rho_crit)
-                                        M_tot = M200
-                                        
-                                       
-                                        #if M_tot > 5e15 or M_tot < 1e13: continue
+                                        sigma_global = float(np.std(observed_vel))
 
-                                        cluster_distance = np.median(observed_vel) / 73.0
+                                        rho_crit = rho_crit_Msunkpc3(73.0)
+                                        M_tot, R200 = estimate_M200_R200_from_sigma(sigma_global, rho_crit)
+
+                                        cluster_distance = float(np.median(observed_vel)) / 73.0
                                         if is_coma:
-                                            z_cluster = np.nanmedian(members['redshift'])
-                                            cluster_distance = (c_light * z_cluster) / 73.0
-                                            dist_mod = 5 * np.log10(cluster_distance * 1e6) - 5
-                                            ext_val = members['extinction_r'].values if 'extinction_r' in members.columns else 0.0
-                                            M_abs = members[mag_col].values - ext_val - dist_mod
-                                            L_B = 10**(-0.4 * (M_abs - 4.67))
-                                            MLR = 2.0
+                                            z_cluster = float(np.nanmedian(members["redshift"].values))
+                                            ext_val = members["extinction_r"].values if "extinction_r" in members.columns else 0.0
+                                            m_star_arr = stellar_mass_from_r_mag(
+                                                members["modelmag_r"].values, ext_val, z_cluster, M_to_L_ratio=2.0
+                                            )
                                         else:
-                                            D_pc = cluster_distance * 1e6
-                                            dist_mod = 5 * np.log10(D_pc) - 5
-                                            M_abs = members[mag_col].values - dist_mod
-                                            L_B = 10**(-0.4 * (M_abs - 5.48))
-                                            MLR = 5.0
-                                        
-                                        M_star_tot = MLR * np.sum(L_B)
+                                            m_star_arr = stellar_mass_from_B_mag(
+                                                members["bmag"].values, cluster_distance, M_to_L_ratio=5.0
+                                            )
+
+                                        M_star_tot = float(np.sum(m_star_arr))
                                         f_gas_global = 0.093 * (((0.7 * M_tot) / 2e14)**0.21)
-                                        M_gas_tot = (0.7 * M_tot) * f_gas_global
-                                        
-                                        # Sottrazione pura
-                                        M_DM_tot = np.maximum(0.0, M_tot - M_star_tot - M_gas_tot)
+                                        M_gas_tot = float((0.7 * M_tot) * f_gas_global)
+
+                                        M_DM_tot = max(0.0, M_tot - M_star_tot - M_gas_tot)
                                         perc_dm = (M_DM_tot / M_tot) * 100.0
 
                                         results_data.append({
-                                            "Cluster": os.path.splitext(file)[0],
+                                            "Cluster": "Coma" if is_coma else os.path.splitext(file)[0],
                                             "M_tot": M_tot,
-                                            "Perc_DM": perc_dm
+                                            "Perc_DM": perc_dm,
                                         })
                                         
                                     if results_data:
@@ -6407,9 +6393,12 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                                     ui.label("Image not found").classes('text-red-500')
 
                                             with ui.column().classes('flex-1 items-center '):
-                                                table_filepath = os.path.join(CLUSTER_TABLES_PATH, os.path.splitext(selected_file)[0] + ".csv")
+                                                if selected_file.lower() == "abell1656(coma).csv":
+                                                    table_filepath = os.path.join(CLUSTER_TABLES_PATH, "coma_table.csv")
+                                                else:
+                                                    table_filepath = os.path.join(CLUSTER_TABLES_PATH, os.path.splitext(selected_file)[0] + ".csv")
                                                 if os.path.exists(table_filepath):
-                                                    df_table = pd.read_csv(table_filepath)
+                                                    df_table = pd.read_csv(table_filepath, header=None, names=["Property", "Value"])
                                                     ui.table.from_pandas(df_table).props('aria-label=Table of the selected galaxy cluster characteristics role=table').classes('w-full max-w-xl')
                                                     reference_box("""
         **Cluster data references:**  
