@@ -124,10 +124,10 @@ def create_page():
         return file_map
 
 #constants
-    rho_crit = 2.775e2
+    rho_crit = 1.479e2
     G_grav = 4.30091e-6   
     c_light = 3e5         
-    M_sun_r = 4.64  
+    M_sun_r = 4.67  
 
     #function for galaxy
     def c_of_M200(M200, scale=0.3):
@@ -281,7 +281,34 @@ def create_page():
 
         return A * (M200_msun / M_pivot)**B * (1 + z)**C
 
+    def filter_cluster_members(df, vel_col="RV"):
+        """Filtro a 2 stadi identico a generate_grids_over_5.py e main.tex Sec. 3.3:
+        1) finestra +-6000 km/s dal picco, 2) MAD 3-sigma clipping iterativo."""
+        if len(df) < 5:
+            return df.copy()
+        counts, bin_edges = np.histogram(df[vel_col].values, bins=50)
+        v_peak = 0.5 * (bin_edges[np.argmax(counts)] + bin_edges[np.argmax(counts) + 1])
+        members = df[(df[vel_col] >= v_peak - 6000.0) & (df[vel_col] <= v_peak + 6000.0)].copy()
+        for _ in range(5):
+            if len(members) < 5:
+                break
+            v_rel = members[vel_col] - np.median(members[vel_col])
+            mad = np.median(np.abs(v_rel))
+            sigma_clip = 1.4826 * mad if mad > 0 else np.std(v_rel)
+            new_members = members[np.abs(v_rel) <= 3.0 * sigma_clip]
+            if len(new_members) == len(members):
+                break
+            members = new_members
+        return members
 
+    def stellar_mass_from_B_mag(bmag, cluster_distance_Mpc, M_to_L_ratio=5.0):
+        """Massa stellare in banda B per i cluster Abell SARS (main.tex Eqs. 19-20)."""
+        M_sun_B = 5.48
+        dist_mod = 5.0 * np.log10(cluster_distance_Mpc * 1e6) - 5.0
+        M_abs = bmag - dist_mod
+        L_B = 10.0**(-0.4 * (M_abs - M_sun_B))
+        return L_B * M_to_L_ratio
+    
     def estimate_M200_R200_from_sigma2(sigma_obs, rho_crit_local, G=G_grav,
                                     R200_min=100.0, R200_max=5000.0,
                                     verbose=False):
@@ -846,38 +873,34 @@ def create_page():
                 return None
         @lru_cache(maxsize=32)
         def get_cluster_data_cached(filename):
-           
-          
             if filename.lower() == "abell1656(coma).csv":
-             
-                return load_coma_dataset("Abell1656(Coma).csv")
+                data_path = os.path.join(DATA_DIR, "Abell1656(Coma).csv")
+                if not os.path.exists(data_path):
+                    return None
+                try:
+                    df_coma = pd.read_csv(data_path, skiprows=1)
+                    df_coma.columns = ['objid', 'ra', 'dec', 'modelmag_r', 'modelmagerr_r', 'extinction_r', 'redshift', 'zErr']
+                    df_coma = df_coma.dropna(subset=['ra', 'dec', 'redshift', 'modelmag_r']).copy()
+                    df_coma['RV'] = c_light * df_coma['redshift']
+                    return df_coma
+                except Exception as e:
+                    print(f"Error loading Coma {filename}: {e}")
+                    return None
 
-         
             data_filepath = os.path.join(CLUSTER_DATA_PATH, filename)
-            
             if not os.path.exists(data_filepath):
                 return None
 
             try:
                 df = pd.read_csv(data_filepath, sep=r"\s+", header=None)
-
-              
                 if df.shape[1] == 7:
                     df[7] = np.nan
-
-             
                 df = df.iloc[:, :8]
                 df.columns = ["Cluster", "ID", "RAdeg", "DEdeg", "RV", "e_RV", "q_RV", "bmag"]
-
-          
                 for col in ["RAdeg", "DEdeg", "RV", "bmag"]:
                     df[col] = pd.to_numeric(df[col], errors="coerce")
-
                 df = df.dropna(subset=["RAdeg", "DEdeg", "RV", "bmag"])
-            
-
                 return df
-
             except Exception as e:
                 print(f"Error loading cluster {filename}: {e}")
                 return None
@@ -995,9 +1018,9 @@ def create_page():
                         <h3>Part 4: Mathematical Derivation </h3>
                         <ul>
                             <li>Consider the context of the planets rotating around the Sun, where the force of gravity and centripetal acceleration act. The goal is to find the rotation velocity to understand what the constant <i>c</i> equals.</li>
-                            <li>Write the formula for the gravitational force and the centripetal force of circular motion.</li>
+                            <li>Write the formula for the gravitational force and the 2nd law force of circular motion.</li>
                             <li>How can we derive the orbital velocity using these two formulas?</li>
-                            <li>Write the equivalence: <i>F<sub>grav</sub> = F<sub>cent</sub></i>.</li>
+                            <li>Write the equivalence: <i>F<sub>grav</sub> = m*a<sub>c</sub></i>.</li>
                             <li>Perform the simplifications of the mass and distance terms on both sides of the equation.</li>
                             <li>Derive <i>v<sup>2</sup></i> by manipulating the equation and then find the velocity (without the square).</li>
                             <li>What terms does the constant include?</li>
@@ -1688,12 +1711,9 @@ def create_page():
 
     <p>Where <span class="math">\(\rho_s\)</span> is the central density and <span class="math">\(r_s\)</span> is the core radius.</p>
     <h4>Adapted to the Dataset</h4>
-    <p>The values for <span class="math">\(\rho_s\)</span> and <span class="math">\(r_s\)</span> are not arbitrary; they are <b>adapted to the specific galaxy dataset</b> (Observational Matching):</p>
-    <ul style="list-style-type: disc; margin-left: 20px;">
-        <li>We calculate the "required" dark matter density <span class="math">\(\rho_{DM}\)</span> derived directly from the observed velocity data at a specific outer radius (<span class="math">\(r_{match}\)</span>), where the dark matter effect is dominant.</li>
-        <li>We force the Burkert model to match this observation: <span class="math">\(\rho_{Burkert}(r_{match}) = \rho_{DM}(r_{match})\)</span>.</li>
-    </ul>
-    <p>This ensures that the halo structure (defined by its virial mass <span class="math">\(M_{200}\)</span> and concentration <span class="math">\(c\)</span>) is physically consistent with the real galaxy properties you are analyzing.</p>
+    <p>The values for <span class="math">\(\rho_s\)</span>, <span class="math">\(r_s\)</span>, and the stellar mass-to-light ratios (<span class="math">\(\Upsilon_{\mathrm{disk}}, \Upsilon_{\mathrm{bulge}}\)</span>) are <b>fitted directly to each galaxy's SPARC rotation curve</b> via global <b>Differential Evolution</b> <span class="math">\(\chi^2\)</span> minimization with log-normal priors centered at <span class="math">\(\Upsilon_{\mathrm{disk}} = 0.5\)</span> and <span class="math">\(\Upsilon_{\mathrm{bulge}} = 0.7\)</span>.</p>
+
+       
     <hr class="my-4">
 
     <h3>Activity Instructions</h3>
@@ -1723,11 +1743,10 @@ def create_page():
     </ol>
     <h4>References</h4>
     <div style="font-size: 0.9em; line-height: 1.4; color: #444;">
-        <p style="margin-bottom: 5px;"><b> Derivation of DM Distribution:</b> Karukes, Salucci & Gentile (2015), "The Dark Matter Distribution in the Spiral NGC 3198 out to 0.22 R_vir".</p>
         <p style="margin-bottom: 5px;"><b>Burkert Profile:</b> Burkert (1995), "The Structure of Dark Matter Halos in Dwarf Galaxies".</p>
-        <p style="margin-bottom: 5px;"><b> Mass Models:</b> Lelli F. et al. (2016), "SPARC: Mass Models for 175 Disk Galaxies with Spitzer Photometry...".</p>
-        <p style="margin-bottom: 5px;"><b> Halo Density:</b> Li et al. (2019), "A constant characteristic volume density of dark matter haloes from SPARC rotation curves".</p>
-        <p style="margin-bottom: 5px;"><b> Rotation Curve:</b> Karukes E. V., Salucci P. (2016), "The Universal Rotation Curve of Dwarf Disk Galaxies".</p>
+        <p style="margin-bottom: 5px;"><b>Mass Models:</b> Lelli F. et al. (2016), "SPARC: Mass Models for 175 Disk Galaxies with Spitzer Photometry...".</p>
+        <p style="margin-bottom: 5px;"><b>Halo Fitting Benchmark:</b> Li P. et al. (2020), "A Comprehensive Catalog of Dark Matter Halo Models for SPARC Galaxies", ApJS, 247, 31.</p>
+        <p style="margin-bottom: 5px;"><b>Mass-to-Light Ratios:</b> McGaugh S. et al. (2016), "Radial Acceleration Relation in Rotationally Supported Galaxies", PRL, 117, 201101.</p>
     </div>
 """).props("id=ngc3198-info role=document aria-live=polite")
                         aria_button("close",'close',on_click=lambda:info_galaxy.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
@@ -1868,7 +1887,7 @@ def create_page():
                     with ui.dialog() as galaxy_3d_dialog, ui.card().style('width: 1200px; max-width: 95vw; height: 90vh;').classes('p-6 overflow-hidden flex flex-col bg-white').props('aria-label="3D Galaxy Model" role=dialog'):
                         
                         with ui.row().classes('w-full justify-between items-center mb-1 shrink-0'):
-                            ui.label("Galaxy structure andmass distribution").classes("text-2xl font-bold text-slate-800")
+                            ui.label("Galaxy structure and mass distribution").classes("text-2xl font-bold text-slate-800")
                             with ui.row().classes('gap-4'):
                                 aria_button("Info", 'instructions', on_click=lambda: [galaxy_3d_info_dialog.open(), ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-6 rounded shadow-md")
                                 aria_button("Close", 'close', on_click=lambda: galaxy_3d_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md")
@@ -2075,14 +2094,13 @@ def create_page():
                                 aria_button('Close', 'close', on_click=comp_physics_dialog.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
                             
                           
-                            with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as tabs:
+                            with ui.tabs().classes('w-full text-white bg-slate-700 shrink-0') as physics_tabs:
                                 t_comp = ui.tab('Computational Notes')
                                 t_chi2 = ui.tab('χ² Minimization')
                                 t_morpho = ui.tab('Morphology Top-View')
-                                #t_3d = ui.tab('3D Mass Distribution')
-                                tabs.on_value_change(lambda: ui.run_javascript("setTimeout(() => { if(typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 100)"))
-                          
-                            with ui.tab_panels(tabs, value=t_comp).classes('w-full h-full p-6 overflow-y-auto bg-gray-50 text-slate-900'):
+                                physics_tabs.on_value_change(lambda: ui.run_javascript("setTimeout(() => { if(typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 100)"))
+
+                            with ui.tab_panels(physics_tabs, value=t_comp).classes('w-full h-full p-6 overflow-y-auto bg-gray-50 text-slate-900'):
                                     
                                 with ui.tab_panel(t_comp):
                                     @ui.refreshable
@@ -2102,8 +2120,8 @@ def create_page():
                                                     
                                                     <ul>
                                                         <li>
-                                                            <b>Step 1:</b> Baryonic velocity with Mass-to-Light ratio (\( \Upsilon \))<br>
-                                                            <span class="math">\( v_{\mathrm{bar}}^2(r) = v_{\mathrm{gas}}(r)|v_{\mathrm{gas}}(r)| + \Upsilon \left[ v_{\mathrm{disk}}(r)|v_{\mathrm{disk}}(r)| + v_{\mathrm{bulge}}(r)|v_{\mathrm{bulge}}(r)| \right] \)</span>
+                                                            <b>Step 1:</b> Baryonic velocity with Mass-to-Light ratios (\( \Upsilon_{\mathrm{disk}}, \Upsilon_{\mathrm{bulge}} \))<br>
+<span class="math">\( v_{\mathrm{bar}}^2(r) = v_{\mathrm{gas}}(r)|v_{\mathrm{gas}}(r)| + \Upsilon_{\mathrm{disk}}\, v_{\mathrm{disk}}(r)|v_{\mathrm{disk}}(r)| + \Upsilon_{\mathrm{bulge}}\, v_{\mathrm{bulge}}(r)|v_{\mathrm{bulge}}(r)| \)</span>
                                                         </li>
                                                         
                                                         <li style="margin-top: 8px;">
@@ -2128,9 +2146,8 @@ def create_page():
                                                         
                                                         <li style="margin-top: 8px;">
                                                             <b>Step 6:</b> Global Fit parameters<br>
-                                                            The structural parameters \( \rho_s, r_s \) and \( \Upsilon \) are pre-calculated via a global \( \chi^2 \) minimization on the entire rotation curve dataset.
+The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \Upsilon_{\mathrm{bulge}} \) when present) are pre-calculated via global Differential Evolution \( \chi^2 \) minimization on the SPARC rotation curve.
                                                         </li>
-                                                        
                                                         <li style="margin-top: 8px;">
                                 <b>Step 7:</b> Enclosed dark matter mass (Burkert)<br>
                                 <span class="math">\( M_{\mathrm{DM}}(r) = 2 \pi \rho_s r_s^3 \left[0.5 \ln(1+x^2) + \ln(1+x) - \arctan(x)\right], \;\; x = \tfrac{r}{r_s} \)</span>
@@ -2147,8 +2164,8 @@ def create_page():
                                                         </li>
                                                         
                                                         <li style="margin-top: 8px;">
-                                                            <b>Step 10:</b> Fit quality (χ²/d.o.f)<br>
-                                                            <span class="math">\( \chi^2 = \sum_i \left(\tfrac{v_{\mathrm{obs}}(r_i) - v_{\mathrm{tot,sim}}(r_i)}{\sigma_i}\right)^2 \)</span>
+                                                            <b>Step 10:</b> Fit quality (reduced \( \chi^2/\mathrm{dof} \))<br>
+<span class="math">\( \chi^2_{\mathrm{red}} = \frac{1}{N - 3} \sum_{i=1}^N \left(\tfrac{v_{\mathrm{obs}}(r_i) - v_{\mathrm{tot,sim}}(r_i)}{\sigma_i}\right)^2 \)</span>
                                                         </li>
                                                     </ul>
                     <h4>Plot Legend</h4>
@@ -2204,14 +2221,14 @@ def create_page():
             <div class="mt-2 text-center">
                 <span class="math">\( \chi^2 = \sum \frac{(O_i - T_i)^2}{\sigma_i^2} \)</span>
             </div>
-            <p class="text-xs mt-1 italic">Where \( O_i \) is the observed value (blue curve), \( T_i \) is the theoretical value (red curve),at point \( i \) and \( \sigma_i \) is the experimental error from data. </p>
+            <p class="text-xs mt-1 italic">Where \( O_i \) is the observed value (blue curve), \( T_i \) is the simulated model value (green curve),at point \( i \) and \( \sigma_i \) is the experimental error from data. </p>
         </div>
         <p class="mb-2">Use the instructions below to compute the &chi;&sup2; minimum of a parabola defined by three points (a, f(a)), (b, f(b)), (c, f(c)).</p>
         
         <ul class="list-disc pl-5 space-y-1">
             <li><b>1a)</b> Choose 3 values of dark matter fraction (f) with the slider above to compute the &chi;&sup2; at that point.</li>
             <li><b>1b)</b> Press <b>'Add &chi;&sup2; point'</b> button to add the point to the &chi;&sup2; plot.</li>
-            <li><b>2a)</b> Input 3 values for dark matter mass points (x-coordinates).</li>
+            <li><b>2a)</b> Input 3 values for the dark matter fraction (M_DM / M_tot, between 0 and 1).</li>
             <li><b>2b)</b> Press <b>'compute &chi;&sup2; and minimum'</b> button to calculate the &chi;&sup2; at those points and check the minimum on the plot.</li>
         </ul>
 
@@ -2609,7 +2626,7 @@ def create_page():
                     slider_max_gal = getattr(alpha_slider, 'max', 10.0)
                     
                     x_min_chi = 0.0
-                    x_max_chi = slider_max_gal * 1.05 if slider_max_gal > 0 else 10.0
+                    x_max_chi = 1
                     y_min_chi = 0.0
                     y_max_chi = chi2_max_possible
                         
@@ -3517,8 +3534,8 @@ def create_page():
                                         
                                         <ul>
                                             <li>
-                                                <b>Step 1:</b> Compute the baryonic velocity from data (conserving the gas rotation sign and applying the Mass-to-Light ratio \(\Upsilon\)):<br>
-                                                <span class="math">\( v_{\mathrm{bar}}^2 = v_{\mathrm{gas}}|v_{\mathrm{gas}}| + \Upsilon \left[ v_{\mathrm{disk}}|v_{\mathrm{disk}}| + v_{\mathrm{bulge}}|v_{\mathrm{bulge}}| \right] \)</span>
+                                                <b>Step 1:</b> Compute the baryonic velocity from data (conserving the gas rotation sign and applying the disk and bulge Mass-to-Light ratios \(\Upsilon_{\mathrm{disk}}, \Upsilon_{\mathrm{bulge}}\)):<br>
+<span class="math">\( v_{\mathrm{bar}}^2 = v_{\mathrm{gas}}|v_{\mathrm{gas}}| + \Upsilon_{\mathrm{disk}}\,v_{\mathrm{disk}}|v_{\mathrm{disk}}| + \Upsilon_{\mathrm{bulge}}\,v_{\mathrm{bulge}}|v_{\mathrm{bulge}}| \)</span>
                                             </li>
                                             
                                             <li style="margin-top: 10px;">
@@ -3729,7 +3746,7 @@ def create_page():
                                             ui.html(')<span class="math-sup">2</span> &middot; ')
                                             answer_rad['el2'] = aria_select_input(vars_options_gal, "Select variable for radius in total mass")
                                         with ui.row().classes('denominator w-full justify-center'):
-                                            answer_rad['el2'] = aria_select_input(vars_options_gal, "Select variable for radius in total mass")
+                                            answer_g['el2'] = aria_select_input(vars_options_gal, "Select variable for gravitational constant in total mass")
 
                                 ui.label("5) Compute Dark Matter Mass").classes('text-blue-200 font-bold text-lg')
                                 with ui.row().classes('items-center gap-1 mt-1 math-text'):
@@ -3956,7 +3973,11 @@ def create_page():
                         v_gas = (answer_vgas.get('el') and answer_vgas['el'].value or '').strip().lower()
                         v_disk= (answer_vdisk.get('el') and answer_vdisk['el'].value or '').strip().lower()
                         v_bul = (answer_vbulge.get('el') and answer_vbulge['el'].value or '').strip().lower()
+                        r2 = (answer_rad.get('el2') and answer_rad['el2'].value or '').strip().lower()
+                        g2 = (answer_g.get('el2') and answer_g['el2'].value or '').strip().lower()
 
+                        ok_r2 = r2 in ("rad", "radius", "r")
+                        ok_g2 = g2 in ("g", "gravitational_constant")
 
                         ok_v1    = v1 in ('v_bar','vbar','v_baryonic','v baryonic','v-baryonic')
                         ok_v2    = v2 in ('v_obs','vobs','v_obs_ngc','v_observations')
@@ -3970,30 +3991,31 @@ def create_page():
 
 
                         for ans in [answer_vb, answer_vo, answer_rad, answer_g,
-                answer_Mtot, answer_Mbar, answer_vgas, answer_vdisk, answer_vbulge]:
-                            el = ans.get('el')
-                            if el:
-                                el.error = None
-                                el.classes(remove='border-red-500 border-green-500')
+            answer_Mtot, answer_Mbar, answer_vgas, answer_vdisk, answer_vbulge]:
+                            for k in ('el', 'el2'):
+                                el = ans.get(k)
+                                if el:
+                                    el.error = None
+                                    el.classes(remove='border-red-500 border-green-500')
 
-                        def mark(ans, ok):
-                            if ans.get('el'):
-                                if ok:
-                                    ans['el'].classes(add='border-green-500')
-                                else:
-                                    ans['el'].classes(add='border-red-500')
+                        def mark(ans, ok, key='el'):
+                            el = ans.get(key)
+                            if el:
+                                el.classes(add='border-green-500' if ok else 'border-red-500')
 
                         mark(answer_vb, ok_v1)
                         mark(answer_vo, ok_v2)
-                        mark(answer_rad, ok_r)
-                        mark(answer_g, ok_g)
+                        mark(answer_rad, ok_r, 'el')
+                        mark(answer_g, ok_g, 'el')
                         mark(answer_Mtot, ok_Mtot)
                         mark(answer_Mbar, ok_Mbar)
                         mark(answer_vgas, ok_vgas)
                         mark(answer_vdisk, ok_vdisk)
                         mark(answer_vbulge, ok_vbul)
+                        mark(answer_rad, ok_r2, 'el2')
+                        mark(answer_g, ok_g2, 'el2')
 
-                        if all([ok_v1, ok_v2, ok_r, ok_g, ok_Mtot, ok_Mbar, ok_vgas, ok_vdisk, ok_vbul]):
+                        if all([ok_v1, ok_v2, ok_r, ok_g, ok_Mtot, ok_Mbar, ok_vgas, ok_vdisk, ok_vbul, ok_r2, ok_g2]):
                             accessible_notify('All correct! Running analysis...', type_='success')
                             update_galaxy_mass_analysis()
                         else:
@@ -4044,16 +4066,31 @@ def create_page():
                             "x_model": [], "y_model": [], "vx_model": [], "vy_model": []
                         }
                     }
+                    def compute_cluster_slider_physics(slider_val, slider_max=None):
+                        """Calcola masse e dispersioni globali (senza raggio proiettato) dallo slider f in [0, 2]."""
+                        f = float(slider_val)  # f=0: solo barioni; f=1: M200 esatta; f=2: 2x DM
+                        M_bar_tot = cluster_state.get('M_bar_tot', 0.0)
+                        M_dm_true = cluster_state.get('M_dm_true', 0.0)
+                        R200 = cluster_state.get('R200', 1000.0)
+
+                        M_dm_sim = f * M_dm_true
+                        M_tot_sim = max(M_bar_tot + M_dm_sim, 1e-6)
+                        dm_ratio_display = (M_dm_sim / M_tot_sim) if M_tot_sim > 0 else 0.0
+
+                        sigma_bar = cluster_state.get('sigma_bar_global', 0.0)
+                        sigma_sim = float(np.sqrt((G_grav * M_tot_sim) / (3.0 * R200))) if R200 > 0 else 0.0
+
+                        return M_tot_sim, M_dm_sim, M_bar_tot, dm_ratio_display, sigma_bar, sigma_sim
                     with ui.dialog() as instruction_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props('aria-label="Cluster simulation instructions" role=dialog'):
                         html_info_box(r"""
     <h3> Cluster Simulation</h3>
     <p>Explore the dynamics of the Coma Cluster and the evidence for Dark Matter using the Virial Theorem.</p>
 
-    <h4>Legend</h4>
+   <h4>Legend</h4>
     <ul style="margin-bottom: 10px;">
-        <li><b>Blue Histogram:</b> Real observed velocity distribution. It is wide, indicating high velocity dispersion (<span class="math">\(\sigma_{obs}\)</span>).</li>
-        <li><b>Red Histogram:</b> Prediction based on <b>visible baryonic mass</b> only. It is narrow, implying galaxies should move slowly.</li>
-        <li><b>Green Histogram:</b> Simulation that updates in real-time as you add Dark Matter.</li>
+        <li><b>Blue Histogram:</b> Real observed peculiar velocity distribution (centered at 0 km/s). It is wide, indicating high velocity dispersion (<span class="math">\(\sigma_{obs}\)</span>).</li>
+        <li><b>Red Histogram:</b> Prediction based on <b>visible baryonic mass</b> only (stars + hot gas). It is narrow, implying galaxies should move slowly.</li>
+        <li><b>Green Histogram:</b> Simulation that starts overlapping the red baryonic distribution and widens in real-time as you add Dark Matter.</li>
     </ul>
 <hr class="my-4">
 
@@ -4066,13 +4103,13 @@ def create_page():
     <div style="text-align:center; margin: 15px 0;">
         <span class="math">$$ \sigma_{sim} = \sqrt{\frac{G M_{tot}}{3 R_{200}}} $$</span>
     </div>
-
-    <h4>How the Slider Works</h4>
-    <p>When you move the slider, you are changing the fraction <span class="math">\(f\)</span> of Dark Matter in the total mass equation:</p>
+<h4>How the Slider Works</h4>
+    <p>When you move the slider, you inject a fraction <span class="math">\(f\)</span> of the virial Dark Matter mass <span class="math">\(M_{\mathrm{DM}} = M_{200} - M_{\mathrm{bar}}\)</span> into the total mass:</p>
     <div style="text-align:center; margin: 10px 0;">
-        <span class="math">$$ M_{tot} = M_{bar} + f \cdot M_{200} $$</span>
+        <span class="math">$$ M_{\mathrm{tot,sim}} = M_{\mathrm{bar}} + f \cdot M_{\mathrm{DM}} $$</span>
     </div>
-    <p>As you increase <span class="math">\(f\)</span>, the total mass <span class="math">\(M_{tot}\)</span> increases. Consequently, the simulated velocity dispersion <span class="math">\(\sigma_{sim}\)</span> increases, causing the green histogram to become <b>wider</b> until it matches the observed blue histogram.</p>
+    <p>At slider = 0 (<span class="math">\(f = 0\)</span>), <span class="math">\(M_{\mathrm{tot,sim}} = M_{\mathrm{bar}}\)</span> and the green distribution overlaps the narrow red baryonic curve. Increasing <span class="math">\(f\)</span> raises <span class="math">\(\sigma_{\mathrm{sim}}\)</span>, widening the green histogram until it matches the blue observed data.</p>
+    
     <hr class="my-4">
 
     <h3>Activity Instructions</h3>
@@ -4103,6 +4140,7 @@ def create_page():
         <p style="margin-bottom: 5px;"><b>Baryon Fractions:</b> Giodini, S. et al. (2009), "Stellar and Total Baryon Mass Fractions in Groups and Clusters Since Redshift 1", The Astrophysical Journal, 703:982-993. </p>
     </div>
 """).props('aria-label="Descriptive text about galaxy cluster activity"')
+                        aria_button("Close", "Close the box", on_click=lambda: instruction_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
                     combined_cluster_state = {'step': 0}
 
                     combined_cluster_html = [
@@ -4140,7 +4178,7 @@ def create_page():
 
                             <li>Consider a satellite of mass <i>m</i> in a circular orbit of radius <i>r</i> around a mass <i>M</i> (planet). On your notebook or in the 'Reflection' section in the App's side menu, write the formulas for Kinetic Energy (<i>K</i>) and Gravitational Potential Energy (<i>U</i>).</li>
 
-                            <li>Write Newton's equation of dynamics (<i>F = ma</i>) by inserting the relationship between Gravitational Force and Centripetal Force (replace <i>F</i> with the gravitational force and '<i>m*a</i>' with the centripetal force).</li>
+                            <li>Write Newton's equation of dynamics (<i>F = ma</i>) by inserting the relationship between Gravitational Force and circular motion (replace <i>F</i> with the gravitational force and '<i>m*a</i>' with the centripetal acceleration).</li>
 
                             <li>Multiply both sides of the force equation by <i>r</i>.</li>
 
@@ -4190,7 +4228,7 @@ def create_page():
 
                             <li>Calculate the total stellar mass of the cluster by summing the values of each galaxy in the Stellar Mass column of the dataset <code>=SUM(G2:G108)</code>.</li>
 
-                            <li>Calculate the gas mass of the cluster using the pre-defined formula in Excel column <code>=(0.7*L2) * 0.093 * (((0.7*L2) / (200000000000000 / 0.7)) ^ 0.21)</code>, where <code>L2</code> is the mass calculated in the previous step.</li>
+                            <li>Calculate the gas mass of the cluster using the pre-defined formula in Excel column<code>=(0.7*L2) * 0.093 * (((0.7*L2) / 200000000000000) ^ 0.21)</code>, where <code>L2</code> is the mass calculated in the previous step.</li>
 
                             <li>Calculate the Luminous Mass (stars, gas) by summing the total stellar mass and the gas mass. </li>
 
@@ -4231,7 +4269,7 @@ def create_page():
 
                         <li>This exercise use the chi2 minimization method to find the best fit of the simulated distribution (green) to the observed distribution (blue).  </li>
 
-                        <li>The chi2 value is calculated using the difference squared bewtween the mean observed velocity and the mean simulated velocity, divided by the experimental error.  </li>
+                       <li>The reduced &chi;&sup2; value compares the observed galaxy counts (O<sub>i</sub>, blue) and simulated galaxy counts (E<sub>i</sub>, green) across the velocity bins of the histogram.</li>
 
                         <li>Select a DM mass value using the slider and click 'Add point' (button below the central plot), repeat three times changing the value.</li>
 
@@ -4282,9 +4320,8 @@ def create_page():
                     with ui.dialog() as dataset_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto ').props('aria-label="Dataset info" role=dialog'):
                 
                 
-                        info_box("**Dataset variables**: objid (galaxy ID),ra (right ascension),dec (declination),modelmag_r (apparent magnitude in r band),modelmagerr_r (magnitude error),extinction_r,redshift (z),zErr (redshift error)")
-                                                    
-                        reference_box("""**Dataset reference**: [Kaggle:Coma cluster](https://www.kaggle.com/datasets/mertalkan98/coma-cluster) ; [SDSS](https://www.sdss.org/science/data-release-publications)""").classes('text-base italic')
+                        info_box("**Coma variables (SDSS):** objid, ra, dec, modelmag_r, modelmagerr_r, extinction_r, redshift (z), zErr.  \n**Abell SARS variables:** Cluster, ID, RAdeg, DEdeg, RV (radial velocity in km/s), e_RV, q_RV, bmag (B-band magnitude).")
+                        reference_box("""**Dataset references**: [Kaggle: Coma cluster](https://www.kaggle.com/datasets/mertalkan98/coma-cluster); [SDSS](https://www.sdss.org/science/data-release-publications); Way M.J. et al. (2005), *Redshifts in the Southern Abell Redshift Survey Clusters*.""").classes('text-base italic')
                         template_url_clu ="https://docs.google.com/spreadsheets/d/1LTZNHpg2BlkKZyMrsV_KxcaTGasa7EhD/copy"
                         with ui.row().classes('w-full justify-center gap-4 mt-4'):
         
@@ -4359,73 +4396,32 @@ def create_page():
             .math-den { padding-top: 2px; }
         </style>
                                         <h3>Computational Notes</h3>
-
-        <ul>
-            <li><b>Step 1:</b> Velocity of each galaxy from redshift data:<br>
-            <span class="math">\( v_i = c \cdot z_i \)</span></li>
-
-            <li><b>Step 2:</b> Number of observed galaxies: <span class="math">\( N \)</span></li>
-
-            <li><b>Step 3:</b> Compute the mean velocity:<br>
-            <span class="math">\( \bar{v} = \frac{1}{N} \sum_i v_i \)</span></li>
-
-            <li><b>Step 4:</b> Observed velocity dispersion:<br>
-            <span class="math">\( \sigma_{\mathrm{obs}} = \sqrt{ \frac{1}{N} \sum_i (v_i - \bar{v})^2 } \)</span></li>
-
-            <li><b>Step 5:</b> Comoving distance:<br>
-            <span class="math">\( \chi(z) = \frac{c}{H_0} \int_0^z \frac{dz'}{\sqrt{\Omega_m (1+z')^3 + (1-\Omega_m)}} \)</span></li>
-
-            <li><b>Step 6:</b> Angular diameter distance:<br>
-            <span class="math">\( D_A(z) = \frac{\chi(z)}{1+z} \)</span></li>
-
-            <li><b>Step 7:</b> Define cluster center from BCG or median RA/DEC:<br>
-            <span class="math">\( (\mathrm{center\_ra}, \mathrm{center\_dec}) = (ra[idx_{bcg}], dec[idx_{bcg}]) \;\; \mathrm{or} \;\; (\mathrm{median}(ra), \mathrm{median}(dec)) \)</span></li>
-
-            <li><b>Step 8:</b> Angular separation between galaxies:<br>
-            <span class="math">\( \theta = \arccos(\sin \delta_1 \sin \delta_2 + \cos \delta_1 \cos \delta_2 \cos(\alpha_1 - \alpha_2)) \)</span></li>
-
-            <li><b>Step 9:</b> Critical density:<br>
-            <span class="math">\( \rho_{\mathrm{crit}} = \frac{3 H_0^2}{8 \pi G} \)</span></li>
-
-            <li><b>Step 10:</b> Projected radius:<br>
-            <span class="math">\( r_{\mathrm{proj},i} = \max(\theta_i \cdot D_A) \)</span></li>
-
-            <li><b>Step 11:</b> Virial theorem and total mass <span class="math">\( M_{200} \)</span>:<br>
-            <span class="math">\( \sigma_{\mathrm{obs}}^2 = \frac{G M_{200}}{3 R_{200}}, \;\; M_{200} = \frac{4}{3} \pi 200 \rho_{\mathrm{crit}} R_{200}^3 \)</span></li>
-
-            <li><b>Step 12:</b> Luminosity distance and distance modulus:<br>
-            <span class="math">\( D_L \approx \frac{c \cdot z_{\mathrm{cluster}}}{H_0}, \;\; \mathrm{distmod} = 5 \log_{10}(D_L) - 5 \)</span></li>
-
-            <li><b>Step 13:</b> Magnitude and luminosity:<br>
-            <span class="math">\( M_r = m_r - A_r - (5 \log_{10}(D_L/10\,pc)), \;\; L_r = 10^{0.4(M_{r,\odot} - M_r)} \)</span></li>
-
-            <li><b>Step 14:</b> Stellar/baryonic mass:<br>
-            <span class="math">\( M_{\mathrm{bar}} = (M/L)\,L_r, \;\; (M/L = 2) \)</span></li>
-
-            <li><b>Step 15:</b> Gas mass (Giodini 2009 adapted for \(M_{200}\)):<br> <span class="math">\( M_{\mathrm{gas}} = (0.7 M_{200}) \cdot 0.093 \left( \frac{0.7 M_{200}}{2 \cdot 10^{14} / h} \right)^{0.21} \)</span></li>
-
-            <li><b>Step 16:</b> Total Baryonic Mass:<br> <span class="math">\( M_{\mathrm{lum}} = M_{\mathrm{stars}} + M_{\mathrm{gas}} \)</span></li>
-
-            <li><b>Step 17:</b> Dark Matter Mass (Virial Subtraction):<br>
-            <span class="math">\( M_{\mathrm{DM\_vir}} = M_{200} - M_{\mathrm{lum}} \)</span></li>
-
-            <li><b>Step 18:</b> Total simulated mass (linked to slider \(f\)):<br>
-            <span class="math">\( M_{\mathrm{tot\_sim}}(i) = M_{\mathrm{lum}} + f \cdot M_{\mathrm{DM\_vir}} \)</span></li>
-
-            <li><b>Step 19:</b> Velocity dispersions:
-                <ul style="margin-top:5px; list-style-type:circle;">
-                    <li>Baryonic: <span class="math">\( \sigma_{\mathrm{bar}}(i) = \sqrt{ \frac{G M_{\mathrm{lum}}}{3 r_{\mathrm{proj},i}} } \)</span></li>
-                    <li>Total (simulated): <span class="math">\( \sigma_{\mathrm{sim}}(i) = \sqrt{ \frac{G M_{\mathrm{tot\_sim}}(i)}{3 r_{\mathrm{proj},i}} } \)</span></li>
-                </ul>
-            </li>
-
-            <li><b>Step 20:</b> Plot histograms:
-                <ul style="margin-top:5px; list-style-type:circle;">
-                    <li>Observed histogram: <span class="math">\( \mathrm{plt.hist}(v_{\mathrm{obs}}, bins) \)</span> (blue)</li>
-                    <li>Simulated histogram: <span class="math">\( \mathrm{plt.hist}(\sigma_{\mathrm{sim}}, bins) \)</span> (green)</li>
-                </ul>
-            </li>
+<ul>
+    <li><b>Step 1 — Radial velocities:</b> Direct \( v_i \) from SARS (Way et al., 2005) or \( v_i = c \cdot z_i \) from Coma SDSS redshifts.</li>
+    <li><b>Step 2 — Membership filtering (Beers et al., 1990):</b> Retain galaxies within \( \pm 6000\,\mathrm{km/s} \) of the velocity peak, then apply iterative \( 3\sigma_{\mathrm{MAD}} \) clipping (\( \sigma_{\mathrm{MAD}} = 1.4826 \cdot \mathrm{MAD} \)) to remove foreground/background interlopers, leaving \( N \) cluster members.</li>
+    <li><b>Step 3 — Peculiar velocities &amp; dispersion:</b> Center velocities in the cluster rest frame:
+        <span class="math">\( v_{\mathrm{pec},i} = v_i - \bar{v}, \quad \sigma_{\mathrm{obs}} = \sqrt{\frac{1}{N}\sum_{i=1}^N v_{\mathrm{pec},i}^2} \)</span></li>
+    <li><b>Step 4 — Virial mass \( M_{200} \) and radius \( R_{200} \):</b> Using \( \rho_{\mathrm{crit}} = \frac{3 H_0^2}{8 \pi G} \) (\( H_0 = 73\,\mathrm{km\,s^{-1}\,Mpc^{-1}} \)), solve simultaneously:
+        <span class="math">\( \sigma_{\mathrm{obs}}^2 = \frac{G M_{200}}{3 R_{200}}, \quad M_{200} = \frac{4}{3}\pi (200\rho_{\mathrm{crit}}) R_{200}^3 \)</span></li>
+    <li><b>Step 5 — Luminosity distance &amp; stellar mass:</b> Using the linear Hubble law \( D_L \approx c z_{\mathrm{cluster}} / H_0 \) and distance modulus \( \mu = 5\log_{10}(D_L / 10\,\mathrm{pc}) \):
+        <ul style="margin-top:4px; list-style-type:circle;">
+            <li><b>Coma (r-band):</b> \( M_r = m_r - A_r - \mu \), \( M_{\star,\mathrm{tot}} = \Upsilon_r \sum_i 10^{0.4(4.67 - M_{r,i})} \) with \( \Upsilon_r = 2.0 \) (Bell et al., 2003).</li>
+            <li><b>SARS Abell (B-band):</b> \( M_B = m_B - \mu \), \( M_{\star,\mathrm{tot}} = \Upsilon_B \sum_i 10^{0.4(5.48 - M_{B,i})} \) with \( \Upsilon_B = 5.0 \).</li>
         </ul>
+    </li>
+    <li><b>Step 6 — Gas mass (Giodini et al., 2009):</b> With \( M_{500} \approx 0.7 M_{200} \):
+        <span class="math">\( M_{\mathrm{gas}} = (0.7 M_{200}) \cdot 0.093 \left(\frac{0.7 M_{200}}{2 \times 10^{14}\,M_\odot}\right)^{0.21} \)</span></li>
+    <li><b>Step 7 — Total baryonic &amp; Dark Matter mass:</b>
+        <span class="math">\( M_{\mathrm{bar}} = M_{\star,\mathrm{tot}} + M_{\mathrm{gas}}, \quad M_{\mathrm{DM}} = M_{200} - M_{\mathrm{bar}} \)</span></li>
+    <li><b>Step 8 — Slider-controlled mass &amp; global 1D velocity dispersions:</b>
+        <span class="math">\( M_{\mathrm{tot,sim}} = M_{\mathrm{bar}} + f \cdot M_{\mathrm{DM}} \)</span>
+        <ul style="margin-top:4px; list-style-type:circle;">
+            <li><b>Baryonic (red):</b> \( \sigma_{\mathrm{bar}} = \sqrt{\frac{G M_{\mathrm{bar}}}{3 R_{200}}} \)</li>
+            <li><b>Simulated (green):</b> \( \sigma_{\mathrm{sim}} = \sqrt{\frac{G M_{\mathrm{tot,sim}}}{3 R_{200}}} \)</li>
+        </ul>
+    </li>
+    <li><b>Step 9 — Histograms &amp; phase-space scatter plot:</b> Synthetic peculiar velocities are drawn from \( \mathcal{N}(0, \sigma_{\mathrm{bar}}) \) and \( \mathcal{N}(0, \sigma_{\mathrm{sim}}) \) using 100&times; Monte Carlo oversampling (each point weighted by 1/100) over 39 symmetric bins. The projected radius \( r_{\mathrm{proj},i} = \theta_i D_A \) from the BCG is computed solely to plot the <i>Peculiar Velocity vs. Projected Radius</i> scatter plot and the 3D cluster view.</li>
+</ul>
     """).props('role=dialog aria-modal=true aria-label="Computational notes"')
 
                                    
@@ -4438,58 +4434,15 @@ def create_page():
             .math-den { padding-top: 2px; }
         </style>
                                          <h3>Chi-Square (χ²) Minimization for Histograms</h3>
-
-                        <p>In the cluster panel, the goodness-of-fit between the observed and simulated velocity distributions is calculated using <b>Pearson's Chi-Square Test for binned data</b>.</p>
-
-                       
-
-                        <ul>
-
-                            <li><b>Step 1: Binning the data</b><br>
-
-                            Instead of comparing individual galaxy velocities point-by-point, we group them into velocity intervals (bins) to form a Gaussian bell curve. We then count how many galaxies fall into each bin.</li>
-
-
-
-                            <li><b>Step 2: Pearson's Formula</b><br>
-
-                            <span class="math">\( \chi^2 = \sum_{i=1}^{N_{\mathrm{bins}}} \frac{(O_i - E_i)^2}{\max(E_i, 1.0)} \)</span><br><br>
-
-                            Where:<br>
-
-                            - <span class="math">\( O_i \)</span> = <b>Observed counts</b> (number of real galaxies in bin <i>i</i>).<br>
-
-                            - <span class="math">\( E_i \)</span> = <b>Expected counts</b> (number of simulated galaxies in bin <i>i</i>).
-
-                            </li>
-
-
-
-                            <li><b>Why divide by Expected Counts (\( E_i \))? (Poisson Statistics)</b><br>
-
-                            Counting discrete random events (like how many galaxies end up in a specific velocity bin) follows a <b>Poisson distribution</b>. A fundamental property of Poisson statistics is that the variance (the statistical error squared) is equal to the expected value: <span class="math">\( \sigma_{\mathrm{counts}}^2 \approx E_i \)</span>. Therefore, dividing the squared difference by \( E_i \) correctly weights the statistical significance of the error.</li>
-
-
-
-                            <li><b>Why don't we use the telescope's measurement error?</b><br>
-
-                            The instrumental error of the telescope (e.g., ±30 km/s) tells us the uncertainty of a single galaxy's speed. However, galaxies inside a massive cluster move with an enormous intrinsic velocity dispersion (often > 1000 km/s). This massive statistical spread completely "swallows" the small instrumental error, making it negligible when comparing the shapes of the overall distributions.</li>
-
-
-
-                            <li><b>Step 3: Division by zero protection</b><br>
-
-                            Because our simulated distribution is generated using a random number generator, some bins in the extremes (the tails of the bell curve) might contain exactly 0 galaxies (\( E_i = 0 \)). To prevent the software from crashing due to a division by zero, we enforce a mathematical floor: <span class="math">\( \max(E_i, 1.0) \)</span>.</li>
-
-
-
-                            <li><b>Step 4: Reduced Chi-Square</b><br>
-
-                           
-
-                            <span class="math">\( \chi^2_{\mathrm{red}} = \frac{\chi^2}{N_{\mathrm{bins}} - 2} \)</span><br>
-Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, because we estimate 2 parameters from the data: Mean and Sigma). By tracking this reduced value, you can find the exact Dark Matter mass where the simulated curve best matches the real universe!</li>
-                        </ul>
+<p>The agreement between observed and simulated peculiar velocity distributions is quantified using <b>Pearson's reduced binned Chi-Square</b> (Pearson, 1900; Taylor, 1997).</p>
+<ul>
+    <li><b>Step 1 — Symmetric binning:</b> Peculiar velocities \( v_{\mathrm{pec},i} = v_i - \bar{v} \) are grouped into <b>39 equally spaced bins</b> (40 symmetric edges) centered at \( 0\,\mathrm{km/s} \), giving observed galaxy counts \( O_i \).</li>
+    <li><b>Step 2 — 100&times; Monte Carlo oversampling:</b> To obtain smooth expected counts \( E_i \) without random fluctuations from a single \( N \)-galaxy draw (Barlow &amp; Beeston, 1993), we generate \( 100 N \) velocities from \( \mathcal{N}(0, \sigma_{\mathrm{sim}}) \) and weight each point by \( 1/100 \) so that \( \sum E_i = N \).</li>
+    <li><b>Step 3 — Reduced Chi-Square formula:</b> Evaluated only over the \( B \) valid bins with \( E_i \ge 0.5 \):<br>
+        <span class="math">\( \chi^2_{\nu} = \frac{1}{B - 3} \sum_{i:\, E_i \ge 0.5} \frac{(O_i - E_i)^2}{E_i} \)</span><br>
+        Here \( k = 3 \) constraints are subtracted for the mean velocity (centered at 0), the global velocity dispersion \( \sigma_{\mathrm{sim}} \), and the total sample size \( N \) (Taylor, 1997, Sec. 12.3, p. 269).</li>
+    <li><b>Why divide by \( E_i \)?</b> Bin counts follow Poisson statistics where the variance equals the expected count (\( \sigma_{\mathrm{counts}}^2 = E_i \)).</li>
+</ul>
 
                         """).props('role=dialog aria-modal=true aria-label="Chi-Square explanation"')
 
@@ -4612,55 +4565,38 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                             ui.label("Cluster structure and mass distribution").classes("text-2xl font-bold text-slate-800")
                             with ui.row().classes('gap-4'):
                                 aria_button("Info", 'instructions', on_click=lambda: [cluster_3d_info_dialog.open(), ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-6 rounded shadow-md")
-                                aria_button("Close", 'close', on_click=lambda: cluster_3d_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md")
+                                aria_button("Close", 'close', on_click=lambda: [cluster_3d_dialog.close(), refresh_cluster_plots(full_anim=False)]).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md")
 
                         dialog_status_label_cluster = ui.label("").classes("text-xl font-bold text-center w-full my-1")
                         
                         with ui.row().classes('w-full items-center justify-center gap-4 mt-1 mb-4 shrink-0 bg-slate-50 p-4 rounded-xl shadow-inner border border-slate-200'):
                             ui.label("Add Dark Matter:").classes("font-bold text-lg text-slate-800")
-                            dialog_cluster_dm_slider = ui.slider(min=0.0, max=60.0, value=0.0, step=0.01).classes('w-1/2').props('color=purple label-always')
+                            dialog_cluster_dm_slider = ui.slider(min=0.0, max=2.0, value=0.0, step=0.01).classes('w-1/2').props('color=purple label-always')
 
                         def evaluate_cluster_dm_status_dialog(e=None):
                             try:
+                                if len(cluster_state.get('observed_vel', [])) == 0:
+                                    return
                                 f_slider = float(dialog_cluster_dm_slider.value)
+                                S_max = float(getattr(dialog_cluster_dm_slider, 'max', 60.0))
                                 cluster_name = cluster_state.get('select', 'Cluster').removesuffix('.csv').removesuffix('.txt')
-                                
-                                m_bary_at_gal = cluster_state.get('m_bary_at_gal', [])
-                                if len(m_bary_at_gal) == 0: return
-                                
-                                M200 = cluster_state.get('M200', 1e14)
-                                m_stars_tot = np.sum(m_bary_at_gal)
-                                f_gas_global_fixed = 0.093 * (((0.7 * M200) / 2e14)**0.21)
-                                m_gas_global_fixed = (0.7 * M200) * f_gas_global_fixed
-                                M_bar_tot_fixed = m_stars_tot + m_gas_global_fixed
-                                
-                                M_tot_csv = M200
-                                M_DM_csv_tot = np.maximum(0.0, M_tot_csv - M_bar_tot_fixed)
-                                true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
-                                
-                                S_max = getattr(dialog_cluster_dm_slider, 'max', 60.0)
-                                if cluster_name.lower() == 'abell1656(coma)':
-                                    max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
-                                    progress = float(f_slider / S_max) * max_progress
-                                else:
-                                    progress = float(f_slider / S_max)
-                                
-                                current_fraction = progress * true_dm_ratio
-                                target_fraction = true_dm_ratio
-                                
+
+                                _, _, _, current_fraction, _, _ = compute_cluster_slider_physics(f_slider, slider_max=S_max)
+                                target_fraction = cluster_state.get('true_dm_ratio', 0.0)
+
                                 if current_fraction < 0.05:
                                     msg = "Dark matter missing! Move the slider to add mass."
                                     color_class = "text-red-600"
                                 elif current_fraction < target_fraction - 0.04:
-                                    msg = f"More Dark Matter needed!"
+                                    msg = "More Dark Matter needed!"
                                     color_class = "text-orange-500"
                                 elif current_fraction > target_fraction + 0.04:
-                                    msg = f"Too much Dark Matter!"
+                                    msg = "Too much Dark Matter!"
                                     color_class = "text-orange-500"
                                 else:
                                     msg = f"Perfect! The Dark Matter matches {cluster_name}'s virial mass."
                                     color_class = "text-green-600"
-                                    
+
                                 dialog_status_label_cluster.set_text(msg)
                                 dialog_status_label_cluster.classes(replace=f"text-xl font-bold text-center w-full my-1 {color_class}")
                             except Exception as ex:
@@ -4674,7 +4610,7 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                             with plot_3d_cluster_container:
                                 title_label = ui.label("").classes("text-xl font-bold text-slate-800 mb-2 mt-8 text-center w-full z-10")
                                 fig = go.Figure()
-                                
+
                                 custom_colorbar = dict(
                                     title=dict(text="Velocity<br>Dispersion<br>(km/s)", font=dict(color='black', size=12), side='top'),
                                     tickfont=dict(color='black', size=11), x=-0.12, thickness=15
@@ -4685,47 +4621,32 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                     r_kpc = cluster_state['r_proj_kpc']
                                     current_cluster = cluster_state.get('select', '').removesuffix('.csv').removesuffix('.txt')
                                     r_max_plot = cluster_state.get('R200', np.nanmax(r_kpc)) * 1.05
-                                    
+
                                     f_slider = float(dialog_cluster_dm_slider.value)
-                                    S_max = getattr(dialog_cluster_dm_slider, 'max', 60.0)
-                                    
-                                    m_bary_at_gal = cluster_state['m_bary_at_gal']
-                                    m_stars_tot = np.sum(m_bary_at_gal)
-                                    M200 = cluster_state.get('M200', 1e14)
+                                    S_max = float(getattr(dialog_cluster_dm_slider, 'max', 60.0))
+
+                                    current_M_tot, current_M_DM, _, dm_ratio_display, _, _ = compute_cluster_slider_physics(
+                                        f_slider, slider_max=S_max
+                                    )
+                                    m_stars_tot = cluster_state.get('M_stars_tot', float(np.sum(cluster_state['m_bary_at_gal'])))
+                                    m_gas_global_fixed = cluster_state.get('M_gas_tot', 0.0)
+                                    M_dm_true = cluster_state.get('M_dm_true', 0.0)
+                                    progress = (current_M_DM / M_dm_true) if M_dm_true > 0 else 0.0
                                     c_nfw = cluster_state.get('c', 4.0)
-                                    
-                                    f_gas_global_fixed = 0.093 * (((0.7 * M200) / 2e14)**0.21)
-                                    m_gas_global_fixed = (0.7 * M200) * f_gas_global_fixed
-                                    M_bar_tot_fixed = m_stars_tot + m_gas_global_fixed
-                                    
-                                    M_tot_csv = M200
-                                    M_DM_csv_tot = np.maximum(0.0, M_tot_csv - M_bar_tot_fixed)
-                                    true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
-                                    
-                                    if current_cluster.lower() == 'abell1656(coma)':
-                                        max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
-                                        progress = float(f_slider / S_max) * max_progress
-                                    else:
-                                        progress = float(f_slider / S_max)
-                                        
-                                    dm_ratio_display = progress * true_dm_ratio
+
                                     dialog_cluster_dm_slider.props(f'label-value="DM: {dm_ratio_display * 100:.1f}%"')
                                     title_label.set_text(f"3D Mass Distribution: {current_cluster}")
 
-                                    current_M_DM = progress * M_DM_csv_tot
-                                    current_M_tot = M_bar_tot_fixed + current_M_DM
-                                    
-                                    # Fissiamo i punti assoluti per non ingigantire il gas quando la DM è zero
                                     n_gas = 1500 if m_gas_global_fixed > 0 else 0
-                                    n_dm = int(8000 * progress) if current_M_tot > 0 else 0
+                                    n_dm = int(4000 * progress) if current_M_DM > 0 else 0
 
                                     r_array = np.linspace(0.1, cluster_state.get('R200', 2000), 500)
-                                    
+
                                     if m_gas_global_fixed > 0:
-                                        M_gas_enclosed = Mc_nfw_enclosed(r_array, m_gas_global_fixed, max(c_nfw*0.8, 0.1), cluster_state['rho_crit'])
-                                    else: M_gas_enclosed = np.zeros_like(r_array)
-                                    
-                                    # Profilo BURKERT per la Dark Matter (calcolato in base alla massa corrente)
+                                        M_gas_enclosed = Mc_nfw_enclosed(r_array, m_gas_global_fixed, max(c_nfw * 0.8, 0.1), cluster_state['rho_crit'])
+                                    else:
+                                        M_gas_enclosed = np.zeros_like(r_array)
+
                                     rho_s = cluster_state.get('rho_s', 1.0)
                                     r_s = cluster_state.get('r_s', 100.0)
                                     M_dm_base = M_burkert_enclosed(r_array, rho_s, r_s)
@@ -4733,7 +4654,7 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                         M_dm_enclosed = (M_dm_base / np.nanmax(M_dm_base)) * current_M_DM
                                     else:
                                         M_dm_enclosed = np.zeros_like(r_array)
-                                    
+
                                     if current_M_tot > 0:
                                         sigma_array = calculate_sigma_los_nfw(r_array, current_M_tot, max(c_nfw, 0.1), cluster_state.get('z_cluster', 0.02), 73.0)
                                     else:
@@ -4750,7 +4671,7 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                         U = np.random.uniform(0, 1, n_pts)
                                         r_pts = np.interp(U, CDF_clean, r_array)
                                         phi = np.arccos(np.random.uniform(-1, 1, n_pts))
-                                        theta = np.random.uniform(0, 2*np.pi, n_pts)
+                                        theta = np.random.uniform(0, 2 * np.pi, n_pts)
                                         x = r_pts * np.sin(phi) * np.cos(theta)
                                         y = r_pts * np.sin(phi) * np.sin(theta)
                                         z = r_pts * np.cos(phi)
@@ -4759,37 +4680,47 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                         return x, y, z, vel_pts, np.stack((r_pts, mass_enc), axis=-1)
 
                                     traces = []
-                                    # 1. GALASSIE: Usano la dispersione peculiare e dimensioni ridotte
                                     if len(cluster_state.get('x_kpc', [])) > 0:
                                         x_gal = cluster_state['x_kpc']
                                         y_gal = cluster_state['y_kpc']
                                         r_gal = cluster_state['r_proj_kpc']
-                                        
                                         std_r = np.std(r_gal) if len(r_gal) > 1 else 10.0
                                         z_gal = np.random.normal(0, std_r, len(x_gal))
-                                        
-                                        # Calcola la peculiar velocity (reale dispersione) per non sforare la colorbar!
-                                        obs_mean = cluster_state.get('obs_mean', np.mean(cluster_state['observed_vel']))
-                                        v_gal_peculiar = np.abs(cluster_state['observed_vel'] - obs_mean)
-                                        
+                                        v_gal_peculiar = np.abs(cluster_state['observed_vel_pec'])
                                         c_data_gal = np.stack((r_gal, np.full_like(r_gal, m_stars_tot)), axis=-1)
-                                        
-                                        # size=3 e color=v_gal_peculiar risolvono il rosso invasivo
-                                        traces.append(go.Scatter3d(x=x_gal, y=y_gal, z=z_gal, mode='markers', marker=dict(size=3, symbol='square', color=v_gal_peculiar, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.9), name=f'■ Galaxies (M: {m_stars_tot:.1e} M_☉)', customdata=c_data_gal, hovertemplate="<b>Galaxies (Real Data)</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Total Stellar Mass: %{customdata[1]:.1e} M_☉"))
-                                    
-                                    # 2. GAS: Fissato secondo Giodini, moderata grandezza
+                                        traces.append(go.Scatter3d(
+                                            x=x_gal, y=y_gal, z=z_gal, mode='markers',
+                                            marker=dict(size=3, symbol='square', color=v_gal_peculiar, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.9),
+                                            name=f'■ Galaxies (M: {m_stars_tot:.1e} M_☉)', customdata=c_data_gal,
+                                            hovertemplate="<b>Galaxies (Real Data)</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Total Stellar Mass: %{customdata[1]:.1e} M_☉"
+                                        ))
+
                                     if n_gas > 0:
                                         x, y, z, v, c_data = sample_cluster_component(M_gas_enclosed, n_gas)
-                                        traces.append(go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=3, symbol='cross', color=v, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.4), name=f'✖ Hot Gas (M: {m_gas_global_fixed:.1e} M_☉)', customdata=c_data, hovertemplate="<b>Intracluster Gas</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Enclosed Mass: %{customdata[1]:.1e} M_☉"))
-                                        
-                                    # 3. DARK MATTER: Dinamica
+                                        traces.append(go.Scatter3d(
+                                            x=x, y=y, z=z, mode='markers',
+                                            marker=dict(size=3, symbol='cross', color=v, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.4),
+                                            name=f'✖ Hot Gas (M: {m_gas_global_fixed:.1e} M_☉)', customdata=c_data,
+                                            hovertemplate="<b>Intracluster Gas</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Enclosed Mass: %{customdata[1]:.1e} M_☉"
+                                        ))
+
                                     if n_dm > 0:
                                         x, y, z, v, c_data = sample_cluster_component(M_dm_enclosed, n_dm)
-                                        traces.append(go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=2, symbol='circle', color=v, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.15), name=f'● DM Halo (M: {current_M_DM:.1e} M_☉)', customdata=c_data, hovertemplate="<b>Dark Matter (Burkert)</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Enclosed Mass: %{customdata[1]:.1e} M_☉"))
+                                        traces.append(go.Scatter3d(
+                                            x=x, y=y, z=z, mode='markers',
+                                            marker=dict(size=2, symbol='circle', color=v, colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, opacity=0.15),
+                                            name=f'● DM Halo (M: {current_M_DM:.1e} M_☉)', customdata=c_data,
+                                            hovertemplate="<b>Dark Matter Halo</b><br>Radius: %{customdata[0]:.0f} kpc<br>Dispersion: %{marker.color:.0f} km/s<br>Enclosed Mass: %{customdata[1]:.1e} M_☉"
+                                        ))
+
                                     for trace in traces:
                                         fig.add_trace(trace)
-                                        
-                                    fig.add_trace(go.Scatter3d(x=[None], y=[None], z=[None], mode='markers', marker=dict(colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, showscale=True, colorbar=custom_colorbar), showlegend=False, hoverinfo='skip'))
+
+                                    fig.add_trace(go.Scatter3d(
+                                        x=[None], y=[None], z=[None], mode='markers',
+                                        marker=dict(colorscale='turbo', cmin=c_min_plot, cmax=c_max_plot, showscale=True, colorbar=custom_colorbar),
+                                        showlegend=False, hoverinfo='skip'
+                                    ))
                                 else:
                                     title_label.set_text("Waiting for valid Cluster Data...")
                                     fig.add_trace(go.Scatter3d(x=[0], y=[0], z=[0], mode='markers', marker=dict(color='rgba(0,0,0,0)')))
@@ -4800,65 +4731,34 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                     legend=dict(font=dict(color='white'), yanchor="top", y=0.95, xanchor="left", x=0.01),
                                     autosize=False, width=1050, height=520
                                 )
-                                
+
                                 global my_cluster_3d_plot
                                 my_cluster_3d_plot = ui.plotly(fig).style('width: 1050px; height: 520px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);')
-
                         render_3d_cluster_plot()
-                        
                         dialog_cluster_dm_slider.on('change', lambda e: [evaluate_cluster_dm_status_dialog(), render_3d_cluster_plot.refresh()])
-                    
-                    
                     
                     chart_obs = None
                     chart_model = None
                     sim_timer = ui.timer(0.05, lambda: None, active=False)
                     def reset_simulation_data():
                         observed_vel = cluster_state.get('observed_vel', [])
-                        if len(observed_vel) == 0: return
+                        if len(observed_vel) == 0:
+                            return
 
-                    
-                        r_proj_kpc = cluster_state['r_proj_kpc']
-                        m_bary_at_gal = cluster_state['m_bary_at_gal']
-                        M200 = cluster_state['M200']
-                        c = cluster_state['c']
-                        rho_crit = cluster_state['rho_crit']
-                        
                         N_gal = min(80, len(observed_vel))
                         cluster_radius = 1.0
-                        rng = np.random.default_rng() 
+                        rng = np.random.default_rng()
 
-                    
                         x_init_obs = rng.uniform(-cluster_radius, cluster_radius, N_gal)
                         y_init_obs = rng.uniform(-cluster_radius, cluster_radius, N_gal)
                         x_init_mod = rng.uniform(-cluster_radius, cluster_radius, N_gal)
                         y_init_mod = rng.uniform(-cluster_radius, cluster_radius, N_gal)
 
-                        
-                        indices = rng.choice(len(observed_vel), size=N_gal, replace=False)
-                        observed_vel_sub = observed_vel[indices]
-                        sigma_obs_val = np.std(observed_vel_sub)
-                        
-                        
+                        sigma_obs_val = cluster_state['sigma_obs']
                         scale_factor = 0.0005
                         vx_obs = rng.normal(0.0, sigma_obs_val, N_gal) * scale_factor
                         vy_obs = rng.normal(0.0, sigma_obs_val, N_gal) * scale_factor
 
-                        
-                        r_safe = np.maximum(r_proj_kpc, 1.0)
-                        
-                        # --- VECCHIO CALCOLO NFW  ---
-                        # rho_s = cluster_state['rho_s']
-                        # r_s = cluster_state['r_s']
-                        # M_dm_base = M_nfw_enclosed(r_safe, rho_s, r_s)
-                        # M_bary_base = np.maximum(m_bary_at_gal, 1e-6)
-                        
-                        # --- NUOVO CALCOLO SOTTRAZIONE VIRIALE ---
-                        sigma_obs_global = cluster_state['sigma_obs']
-                        M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
-                        M_bary_base = np.maximum(m_bary_at_gal, 1e-6)
-                        M_dm_base = np.maximum(0.0, M_tot_virial - M_bary_base)
-                        
                         dir_x_model = rng.normal(0.0, 1.0, N_gal)
                         dir_y_model = rng.normal(0.0, 1.0, N_gal)
 
@@ -4866,86 +4766,44 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                             "x_obs": x_init_obs, "y_obs": y_init_obs,
                             "x_model": x_init_mod, "y_model": y_init_mod,
                             "vx_obs": vx_obs, "vy_obs": vy_obs,
-                            "dir_x_model": dir_x_model, "dir_y_model": dir_y_model, 
-                            "M_dm_base": M_dm_base, "M_bary_base": M_bary_base,    
-                            "r_safe": r_safe,
-                            "rng": rng, "indices": indices,
+                            "dir_x_model": dir_x_model, "dir_y_model": dir_y_model,
+                            "rng": rng,
                             "current_dataset": cluster_state.get("select", "")
                         }
 
                     async def update_cluster_points():
                         try:
                             sim_state = cluster_state.get('sim_state')
-                            
+
                             if not sim_state or sim_state.get("current_dataset") != cluster_state.get("select"):
                                 reset_simulation_data()
                                 sim_state = cluster_state.get('sim_state')
-                                if not sim_state: return
+                                if not sim_state:
+                                    return
 
-                            
                             cluster_radius = 1.0
                             dt = 0.05
                             VELOCITY_SCALE = 0.0005
                             L = 2 * cluster_radius
-                            #TARGET_SLIDER_VALUE = 20.0
-                            
-                            #raw_slider_value = float(dm_slider.value)
-                            #f = raw_slider_value / TARGET_SLIDER_VALUE
-                            f= float(dm_slider.value)
-                            M_bary = sim_state["M_bary_base"]
-                            M_dm = sim_state["M_dm_base"]
-                            r_safe = sim_state["r_safe"]
-                            indices = sim_state["indices"]
-                            
-                            
-                            M_total_withDM = np.maximum(M_bary + f * M_dm, 1e-6)
-                            
-                            
-                            # sigma^2 ~ G * M / R
-                            sigma_sq = (G_grav * M_total_withDM) / (3.0 * r_safe)
-                            sigma_local = np.sqrt(np.maximum(0.0, sigma_sq))
-                            
-                            
-                            sigma_model_current = sigma_local[indices].mean()
 
-                            
-                            # v = direzione * magnitudine(sigma) * fattore_scala
+                            # Fisica globale coerente con lo slider (senza raggio proiettato)
+                            _, _, _, dm_ratio_display, _, sigma_model_current = compute_cluster_slider_physics(float(dm_slider.value))
+
                             vx_model = sim_state["dir_x_model"] * sigma_model_current * VELOCITY_SCALE
                             vy_model = sim_state["dir_y_model"] * sigma_model_current * VELOCITY_SCALE
 
-                            
-                            sim_state["x_obs"] += sim_state["vx_obs"] * dt
-                            sim_state["y_obs"] += sim_state["vy_obs"] * dt
-                            
-                        
-                            sim_state["x_model"] += vx_model * dt
-                            sim_state["y_model"] += vy_model * dt
+                            sim_state["x_obs"] = (sim_state["x_obs"] + sim_state["vx_obs"] * dt + cluster_radius) % L - cluster_radius
+                            sim_state["y_obs"] = (sim_state["y_obs"] + sim_state["vy_obs"] * dt + cluster_radius) % L - cluster_radius
+                            sim_state["x_model"] = (sim_state["x_model"] + vx_model * dt + cluster_radius) % L - cluster_radius
+                            sim_state["y_model"] = (sim_state["y_model"] + vy_model * dt + cluster_radius) % L - cluster_radius
 
-                        
-                            sim_state["x_obs"] = (sim_state["x_obs"] + cluster_radius) % L - cluster_radius
-                            sim_state["y_obs"] = (sim_state["y_obs"] + cluster_radius) % L - cluster_radius
-                            sim_state["x_model"] = (sim_state["x_model"] + cluster_radius) % L - cluster_radius
-                            sim_state["y_model"] = (sim_state["y_model"] + cluster_radius) % L - cluster_radius
-
-                            
-                            data_obs = np.stack((sim_state["x_obs"], sim_state["y_obs"]), axis=1).tolist()
-                            data_model = np.stack((sim_state["x_model"], sim_state["y_model"]), axis=1).tolist()
-
-                            chart_obs.options['series'][0]['data'] = data_obs
-                            chart_model.options['series'][0]['data'] = data_model
-                            
+                            chart_obs.options['series'][0]['data'] = np.stack((sim_state["x_obs"], sim_state["y_obs"]), axis=1).tolist()
+                            chart_model.options['series'][0]['data'] = np.stack((sim_state["x_model"], sim_state["y_model"]), axis=1).tolist()
                             chart_obs.update()
                             chart_model.update()
 
-                            
-                            observed_vel = cluster_state['observed_vel']
-                            sigma_obs_display = np.std(observed_vel[indices])
-                            
-                    
-                            sigma_model_display = sigma_model_current 
-                            
-                            label_stats_obs.set_text(f"σ_obs: {sigma_obs_display:.0f} km/s")
-                            label_stats_model.set_text(f"Simulated σ: {sigma_model_display:.0f} km/s | DM: {f:.2f}")
+                            label_stats_obs.set_text(f"σ_obs: {cluster_state['sigma_obs']:.0f} km/s")
+                            label_stats_model.set_text(f"Simulated σ: {sigma_model_current:.0f} km/s | DM: {dm_ratio_display*100:.1f}%")
 
                         except Exception as e:
                             print(f"Update Error: {e}")
@@ -5049,221 +4907,157 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
 
                 
 
-                    def load_coma_dataset(filename): 
-                  
+                    def _finalize_cluster_state(observed_vel):
+                        """Popola tutte le chiavi di cluster_state in modo allineato a generate_grids_over_5.py,
+                        preservando tutte le chiavi richieste da istogramma, scatter, chi2, animazione 2D e vista 3D."""
+                        cluster_state['observed_vel'] = observed_vel
+                        cluster_state['N_obs'] = len(observed_vel)
+                        cluster_state['obs_mean'] = float(np.mean(observed_vel))
+                        cluster_state['v_mean_val'] = cluster_state['obs_mean']
+                        cluster_state['sigma_obs'] = float(np.std(observed_vel))
+
+                        # Velocità peculiari centrate in 0 (sistema di riferimento del cluster)
+                        v_peculiar = observed_vel - cluster_state['obs_mean']
+                        cluster_state['observed_vel_pec'] = v_peculiar
+
+                        # Massa viriale M200, R200 (Teorema del Viriale, H0 = 73)
+                        rho_crit = rho_crit_Msunkpc3(H0=73.0)
+                        M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], rho_crit)
+                        cluster_state['rho_crit'] = rho_crit
+                        cluster_state['M200'] = M200
+                        cluster_state['R200'] = R200
+
+                        # Parametri ausiliari mantenuti solo per la vista 3D del cluster
+                        cluster_state['c'] = concentration_duffy2008(M200, cluster_state['z_cluster'])
+                        cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(
+                            M200, cluster_state['c'], rho_crit
+                        )
+
+                        # Bilancio di massa globale (Stelle + Gas Giodini 2009 + DM per sottrazione)
+                        m_stars_tot = float(np.sum(cluster_state['m_bary_at_gal']))
+                        f_gas_global = 0.093 * (((0.7 * M200) / 2e14)**0.21)
+                        m_gas_tot = float((0.7 * M200) * f_gas_global)
+                        M_bar_tot = m_stars_tot + m_gas_tot
+                        M_dm_true = max(0.0, M200 - M_bar_tot)
+
+                        cluster_state['M_stars_tot'] = m_stars_tot
+                        cluster_state['M_gas_tot'] = m_gas_tot
+                        cluster_state['M_bar_tot'] = M_bar_tot
+                        cluster_state['M_dm_true'] = M_dm_true
+                        cluster_state['true_dm_ratio'] = (M_dm_true / M200) if M200 > 0 else 0.0
+
+                        # Dispersione barionica globale (larghezza iniziale della curva rossa e della verde a slider=0)
+                        cluster_state['sigma_bar_global'] = float(np.sqrt((G_grav * M_bar_tot) / (3.0 * R200)))
+
+                        # Binning simmetrico centrato in 0 (39 bin = 40 estremi, come generate_grids_over_5.py)
+                        max_abs = max(float(np.abs(v_peculiar).max()), 3.5 * cluster_state['sigma_obs'])
+                        x_lim = max_abs * 1.10
+                        bins = np.linspace(-x_lim, x_lim, 40)
+                        counts_obs, _ = np.histogram(v_peculiar, bins=bins)
+
+                        cluster_state['x_lim'] = x_lim
+                        cluster_state['x_min'] = -x_lim
+                        cluster_state['x_max'] = x_lim
+                        cluster_state['padding'] = 0.0
+                        cluster_state['bins'] = bins
+                        cluster_state['bin_centers'] = 0.5 * (bins[1:] + bins[:-1])
+                        cluster_state['counts_obs'] = counts_obs
+
+                        # Calcolo y_max includendo il picco stretto della curva rossa barionica
+                        rng_tmp = np.random.default_rng(seed=42)
+                        v_bar_tmp = rng_tmp.normal(0.0, cluster_state['sigma_bar_global'], size=len(v_peculiar) * 100)
+                        bar_counts_tmp, _ = np.histogram(v_bar_tmp, bins=bins, weights=np.full(len(v_bar_tmp), 1.0 / 100.0))
+                        cluster_state['y_max'] = float(max(counts_obs.max(), bar_counts_tmp.max()) * 1.3)
+
+                        # Limiti assi per lo scatter plot (r_proj_kpc sull'asse X, v_peculiar sull'asse Y)
+                        cluster_state['r_min'] = float(cluster_state['r_proj_kpc'].min())
+                        cluster_state['r_max'] = float(cluster_state['r_proj_kpc'].max())
+                        cluster_state['r_padding'] = 0.1 * (cluster_state['r_max'] - cluster_state['r_min'])
+                        cluster_state['v_min_global'] = -x_lim
+                        cluster_state['ylim_min'] = -x_lim
+                        cluster_state['ylim_max'] = x_lim
+
+                    def load_coma_dataset(filename):
                         data_path = os.path.join(DATA_DIR, "Abell1656(Coma).csv")
                         df_coma = pd.read_csv(data_path, skiprows=1)
-                        df_coma.columns = ['objid','ra','dec','modelmag_r','modelmagerr_r','extinction_r','redshift','zErr']
-                        cluster_state['observed_vel'] = c_light * df_coma['redshift'].dropna().values
-                        cluster_state['N_obs'] = len(cluster_state['observed_vel'])
-                        cluster_state['v_mean_val'] = np.mean(cluster_state['observed_vel'])
-                        cluster_state['sigma_obs'] = np.std(cluster_state['observed_vel'])
-             
+                        df_coma.columns = ['objid', 'ra', 'dec', 'modelmag_r', 'modelmagerr_r', 'extinction_r', 'redshift', 'zErr']
+                        df_coma = df_coma.dropna(subset=['ra', 'dec', 'redshift', 'modelmag_r']).copy()
+                        df_coma['RV'] = c_light * df_coma['redshift']
 
-                        z_arr = df_coma['redshift'].dropna().values
-                        if len(z_arr) == 0:
-                            raise RuntimeError("No redshifts in df")
-                        cluster_state['z_cluster'] = np.nanmedian(z_arr)
+                        # Filtro a 2 stadi (+-6000 km/s + MAD 3-sigma clipping)
+                        members = filter_cluster_members(df_coma, vel_col="RV")
+                        if len(members) < 5:
+                            members = df_coma.copy()
 
-                        try:
-                            idx_bcg = df_coma['modelmag_r'].dropna().idxmin()
-                            cluster_state['center_ra'] = float(df_coma.loc[idx_bcg, 'ra'])
-                            cluster_state['center_dec'] = float(df_coma.loc[idx_bcg, 'dec'])
-                        except Exception:
-                            cluster_state['center_ra'] = float(np.nanmedian(df_coma['ra'].dropna().values))
-                            cluster_state['center_dec'] = float(np.nanmedian(df_coma['dec'].dropna().values))
-                       
+                        observed_vel = members['RV'].values
+                        cluster_state['z_cluster'] = float(np.nanmedian(members['redshift'].values))
 
-                  
-                        
-                        cluster_distance_Mpc = np.median(z_arr * c_light) / 73.0
+                        # Raggio proiettato e coordinate (solo per scatter plot Velocity vs Radius e vista 3D)
+                        idx_bcg = members['modelmag_r'].idxmin()
+                        cluster_state['center_ra'] = float(members.loc[idx_bcg, 'ra'])
+                        cluster_state['center_dec'] = float(members.loc[idx_bcg, 'dec'])
+
+                        cluster_distance_Mpc = float(np.median(observed_vel)) / 73.0
                         D_A_kpc = cluster_distance_Mpc * 1000.0
-                        #D_A_kpc = angular_diameter_distance_Mpc(cluster_state['z_cluster']) * 1000.0
-                        theta_rad = angsep_rad(df_coma['ra'].values, df_coma['dec'].values, cluster_state['center_ra'], cluster_state['center_dec'])
-                        r_proj_kpc = np.maximum(theta_rad * D_A_kpc, 1e-3)
+                        theta_rad = angsep_rad(
+                            members['ra'].values, members['dec'].values,
+                            cluster_state['center_ra'], cluster_state['center_dec']
+                        )
                         cluster_state['r_proj_kpc'] = np.maximum(theta_rad * D_A_kpc, 1e-3)
-                        cluster_state['x_kpc'] = np.radians(df_coma['ra'].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
-                        cluster_state['y_kpc'] = np.radians(df_coma['dec'].values - cluster_state['center_dec']) * D_A_kpc
+                        cluster_state['x_kpc'] = np.radians(members['ra'].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
+                        cluster_state['y_kpc'] = np.radians(members['dec'].values - cluster_state['center_dec']) * D_A_kpc
 
-                        cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=73.0)
-                        cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(df_coma['modelmag_r'].values, df_coma['extinction_r'].values, cluster_state['z_cluster'])
+                        # Massa stellare in banda r (M_sun,r = 4.67, Upsilon_r = 2.0)
+                        cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(
+                            members['modelmag_r'].values,
+                            members['extinction_r'].values,
+                            cluster_state['z_cluster'],
+                            M_to_L_ratio=2.0
+                        )
 
-                        #M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                        #cluster_state['M200'] = M200
-                        #cluster_state['R200'] = R200
-                        #cluster_state['c'] = concentration_duffy2008(M200, cluster_state['z_cluster'], h=0.7, relaxed=False)
-                        try:
-                            csv_path = os.path.join(dataset_path, 'cluster_best_parameters.csv')
-                            df_params = pd.read_csv(csv_path)
-                            # Usa 'Abell1656(Coma)' in load_coma_dataset, usa gal_name in initialize_cluster_from_df
-                            row = df_params[df_params['Cluster'] == 'abell1656(coma)'] 
-                            if not row.empty:
-                                cluster_state['M200'] = float(row.iloc[0]['M200'])
-                                cluster_state['c'] = float(row.iloc[0]['c'])
-                                cluster_state['r_s'] = float(row.iloc[0]['r_s'])
-                                cluster_state['rho_s'] = float(row.iloc[0]['rho_s'])
-                                cluster_state['R200'] = cluster_state['r_s'] * cluster_state['c']
-                            else:
-                                cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                                cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
-                                cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
-                        except Exception as e:
-                            print(f"CSV Read Error: {e}")
-                            cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                            cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
-                            cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
-                        cluster_state['obs_mean'] = np.mean(cluster_state['observed_vel'])
-                        cluster_state['observed_vel_pec'] = cluster_state['observed_vel'] - cluster_state['obs_mean']
-
-                       
-                        x_min = cluster_state['observed_vel'].min()
-                        x_max = cluster_state['observed_vel'].max()
-                        padding = 0.15 * (x_max - x_min)
-                        cluster_state['x_min'] = x_min
-                        cluster_state['x_max'] = x_max
-                        cluster_state['padding'] = padding
-                        cluster_state['bins'] = np.linspace(0, x_max + padding, 50)
-                       
-                        cluster_state['bin_centers'] = 0.5 * (cluster_state['bins'][1:] + cluster_state['bins'][:-1])
-                        counts, _ = np.histogram(cluster_state['observed_vel'], bins=cluster_state['bins'])
-                        cluster_state['counts_obs'] = counts
-                        
-                        cluster_state['y_max'] = int(np.ceil(np.max(counts) * 1.15))
-                        cluster_state['r_min'] = cluster_state['r_proj_kpc'].min()
-                        cluster_state['r_max'] = cluster_state['r_proj_kpc'].max()
-                        cluster_state['r_padding'] = 0.1 * (cluster_state['r_max'] - cluster_state['r_min'])
-                        
-                        cluster_state['v_min_global'] = 0.0
-                        cluster_state['ylim_min'] = 0.0
-                        cluster_state['ylim_max'] = x_max + 0.2 * abs(x_max)
-                        r_min, r_max = r_proj_kpc.min(), r_proj_kpc.max()
-                    
-
-
+                        _finalize_cluster_state(observed_vel)
                         return df_coma
 
-                   
-
                     def initialize_cluster_from_df(df):
-           
-                        cluster_state['observed_vel'] = df["RV"].values
-                        cluster_state['N_obs'] = len(cluster_state['observed_vel'])
-                        cluster_state['v_mean_val'] = np.mean(cluster_state['observed_vel'])
-                        cluster_state['sigma_obs'] = np.std(cluster_state['observed_vel'])
+                        if df is None or df.empty: return
+                        df_clean = df.dropna(subset=["RAdeg", "DEdeg", "RV", "bmag"]).copy()
+                        df_clean = df_clean[df_clean["bmag"] > 0.0]
 
-                        cluster_state['z_cluster'] = np.nanmedian(cluster_state['observed_vel'] / c_light)
+                        # Filtro a 2 stadi (+-6000 km/s + MAD 3-sigma clipping)
+                        members = filter_cluster_members(df_clean, vel_col="RV")
+                        if len(members) < 5:
+                            members = df_clean.copy()
 
-                        idx_bcg = df["bmag"].idxmin()
-                        cluster_state['center_ra'] = float(df.loc[idx_bcg, "RAdeg"])
-                        cluster_state['center_dec'] = float(df.loc[idx_bcg, "DEdeg"])
-                        cluster_distance_Mpc = np.median(cluster_state['observed_vel']) / 73.0
+                        observed_vel = members["RV"].values
+                        cluster_state['z_cluster'] = float(np.nanmedian(observed_vel / c_light))
+
+                        # Raggio proiettato e coordinate (solo per scatter plot Velocity vs Radius e vista 3D)
+                        idx_bcg = members["bmag"].idxmin()
+                        cluster_state['center_ra'] = float(members.loc[idx_bcg, "RAdeg"])
+                        cluster_state['center_dec'] = float(members.loc[idx_bcg, "DEdeg"])
+
+                        cluster_distance_Mpc = float(np.median(observed_vel)) / 73.0
                         D_A_kpc = cluster_distance_Mpc * 1000.0
-                        #D_A_kpc = angular_diameter_distance_Mpc(cluster_state['z_cluster']) * 1000.0
-                        theta_rad = angsep_rad(df["RAdeg"], df["DEdeg"], cluster_state['center_ra'], cluster_state['center_dec'])
-                        
+                        theta_rad = angsep_rad(
+                            members["RAdeg"].values, members["DEdeg"].values,
+                            cluster_state['center_ra'], cluster_state['center_dec']
+                        )
                         cluster_state['r_proj_kpc'] = np.maximum(theta_rad * D_A_kpc, 1e-3)
-                        # Converte RA e DEC in offset spaziali fisici (kpc) rispetto al centro
-                        cluster_state['x_kpc'] = np.radians(df["RAdeg"].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
-                        cluster_state['y_kpc'] = np.radians(df["DEdeg"].values - cluster_state['center_dec']) * D_A_kpc
-                        cluster_state['rho_crit'] = rho_crit_Msunkpc3(H0=73.0)
+                        cluster_state['x_kpc'] = np.radians(members["RAdeg"].values - cluster_state['center_ra']) * np.cos(np.radians(cluster_state['center_dec'])) * D_A_kpc
+                        cluster_state['y_kpc'] = np.radians(members["DEdeg"].values - cluster_state['center_dec']) * D_A_kpc
 
-                        cluster_state['m_bary_at_gal'] = stellar_mass_from_r_mag(
-                            df["bmag"].values,
-                            0.0,
-                            cluster_state['z_cluster']
+                        # Massa stellare in banda B per SARS Abell (M_sun,B = 5.48, Upsilon_B = 5.0)
+                        cluster_state['m_bary_at_gal'] = stellar_mass_from_B_mag(
+                            members["bmag"].values,
+                            cluster_distance_Mpc,
+                            M_to_L_ratio=5.0
                         )
 
-                        #M200, R200 = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                        #cluster_state['M200'] = M200
-                        ##cluster_state['R200'] = R200
+                        _finalize_cluster_state(observed_vel)
 
-                        #cluster_state['c'] = concentration_duffy2008(M200, cluster_state['z_cluster'], h=0.7, relaxed=False)
-                        gal_name = os.path.splitext(cluster_state['select'])[0]
-                        try:
-                            csv_path = os.path.join(dataset_path, 'cluster_best_parameters.csv')
-                            df_params = pd.read_csv(csv_path)
-                         
-                            row = df_params[df_params['Cluster'] == gal_name] 
-                            if not row.empty:
-                                cluster_state['M200'] = float(row.iloc[0]['M200'])
-                                cluster_state['c'] = float(row.iloc[0]['c'])
-                                cluster_state['r_s'] = float(row.iloc[0]['r_s'])
-                                cluster_state['rho_s'] = float(row.iloc[0]['rho_s'])
-                                cluster_state['R200'] = cluster_state['r_s'] * cluster_state['c']
-                            else:
-                                cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                                cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
-                                cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
-                        except Exception as e:
-                            print(f"CSV Read Error: {e}")
-                            cluster_state['M200'], cluster_state['R200'] = estimate_M200_R200_from_sigma(cluster_state['sigma_obs'], cluster_state['rho_crit'])
-                            cluster_state['c'] = concentration_duffy2008(cluster_state['M200'], cluster_state['z_cluster'])
-                            cluster_state['rho_s'], cluster_state['r_s'], _ = rho_s_from_M200_and_c(cluster_state['M200'], cluster_state['c'], cluster_state['rho_crit'])
-                        cluster_state['obs_mean'] = np.mean(cluster_state['observed_vel'])
-                        cluster_state['observed_vel_pec'] = cluster_state['observed_vel'] - cluster_state['obs_mean']
-        
-                        x_min = cluster_state['observed_vel'].min()
-                        x_max = cluster_state['observed_vel'].max()
-                        padding = 0.15 * (x_max - x_min)
-                        cluster_state['x_min'] = x_min
-                        cluster_state['x_max'] = x_max
-                        cluster_state['padding'] = padding
-
-                        cluster_state['bins'] = np.linspace(0, x_max + padding, 50)
-                      
-                        cluster_state['bin_centers'] = 0.5 * (cluster_state['bins'][1:] + cluster_state['bins'][:-1])
-                        counts, _ = np.histogram(cluster_state['observed_vel'], bins=cluster_state['bins'])
-                        cluster_state['counts_obs'] = counts
-                        cluster_state['y_max'] = int(np.ceil(counts.max() * 1.3))
-
-                        cluster_state['r_min'] = cluster_state['r_proj_kpc'].min()
-                        cluster_state['r_max'] = cluster_state['r_proj_kpc'].max()
-                        cluster_state['r_padding'] = 0.1 * (cluster_state['r_max'] - cluster_state['r_min'])
-
-                        
-                        cluster_state['dm_slider_min'], cluster_state['dm_slider_max'] = 0.0, 0.10
-                        f_max = cluster_state['dm_slider_max']
-
-                        cluster_state['M_bar_tot'] = np.sum(cluster_state['m_bary_at_gal'])
-                        cluster_state['R_cluster_bar'] = r200_from_M200(cluster_state['M_bar_tot'], cluster_state['rho_crit'])
-                        cluster_state['M_tot_max'] = cluster_state['M_bar_tot'] + f_max * cluster_state['M200']
-                        cluster_state['R200_tot'] = r200_from_M200(cluster_state['M_tot_max'], cluster_state['rho_crit'])
-
-                        cluster_state['v_max_expected'] = np.sqrt(G_grav * cluster_state['M_tot_max'] / cluster_state['R200_tot'])
-                        cluster_state['v_max_bar'] = np.sqrt(G_grav * cluster_state['M_bar_tot'] / cluster_state['R_cluster_bar'])
-
-                        cluster_state['v_min_global'] = 0.0
-                        cluster_state['v_max_global'] = max(
-                            cluster_state['observed_vel'].max(),
-                            cluster_state['v_max_expected'] * 1.2,
-                            cluster_state['v_max_bar'] * 1.5
-                        )
-
-                        cluster_state['v_padding'] = 0.1 * (cluster_state['v_max_global'] - cluster_state['v_min_global'])
-                        cluster_state['ylim_min'] = 0.0
-                        cluster_state['ylim_max'] = cluster_state['observed_vel'].max() + 0.2 * abs(cluster_state['observed_vel'].max())
-                    
-                      
-                        
                     def recompute_axis_limits():
-                       
-
-                        x_min = cluster_state['observed_vel'].min()
-                        x_max = cluster_state['observed_vel'].max()
-                        padding = 0.15 * (x_max - x_min)
-                        cluster_state['x_min'] = x_min
-                        cluster_state['x_max'] = x_max
-                        cluster_state['padding'] = padding
-
-                        cluster_state['y_max'] = cluster_state['counts_obs'].max() * 1.3
-
-                        cluster_state['r_min'] = cluster_state['r_proj_kpc'].min()
-                        cluster_state['r_max'] = cluster_state['r_proj_kpc'].max()
-                        cluster_state['r_padding'] = 0.1 * (cluster_state['r_max'] - cluster_state['r_min'])
-                        
-                        cluster_state['v_min_global'] = 0.0
-                        cluster_state['ylim_min'] = 0.0
-                        cluster_state['ylim_max'] = cluster_state['observed_vel'].max() + 0.2 * abs(cluster_state['observed_vel'].max())
+                        # I limiti simmetrici centrati in 0 sono già calcolati in _finalize_cluster_state()
+                        pass
                     def plot_cluster_chi2_curve():
                         cluster_chi2_plot_container.clear()
                         plt.close()
@@ -5275,10 +5069,7 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                 all_ys = []
                                 
                                
-                                M200 = cluster_state.get('M200', 1e14)
-                                slider_max_val = getattr(dm_slider, 'max', 10.0) 
-                              
-                                x_max_chi_fallback = slider_max_val * 1.05 if slider_max_val > 0 else 10.0
+                                x_max_chi_fallback = 1.0
                                 
                                 if chi2_points:
                                     xs, ys = zip(*chi2_points)
@@ -5352,133 +5143,66 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                 
                                 plt.title("χ² Minimization", fontsize=12, fontweight='bold')
                                 plt.tight_layout()
-
+                    
+                   
                     def add_cluster_chi2_point():
                         f = float(dm_slider.value)
-                        S_max = getattr(dm_slider, 'max', 60.0)
-                    
-                        
-                        
-                        observed_vel = cluster_state['observed_vel']
-                        rho_crit = cluster_state['rho_crit']
-                        r_proj_kpc = cluster_state['r_proj_kpc']
-                        m_bary_at_gal = cluster_state['m_bary_at_gal']
+                        v_peculiar = cluster_state['observed_vel_pec']
                         bins = cluster_state['bins']
                         counts_obs = cluster_state['counts_obs']
-                        N_obs = cluster_state['N_obs']
 
-                        r_safe = np.maximum(r_proj_kpc, 1)
-                        
-                        # --- VECCHIO CALCOLO NFW (COMMENTATO) ---
-                        # rho_s = cluster_state['rho_s']
-                        # r_s = cluster_state['r_s']
-                        # M_dm_nfw_arr = M_nfw_enclosed(r_safe, rho_s, r_s)
-                        
-                        h = 0.7
-                        m_stars_tot = np.sum(m_bary_at_gal)
-                        
-                       
-                        sigma_obs_global = cluster_state['sigma_obs']
-                        M200_val, _ = estimate_M200_R200_from_sigma(sigma_obs_global, cluster_state['rho_crit'])
-                        
-                        f_gas_global_fixed = 0.093 * (((0.7 * M200_val) / 2e14)**0.21)
-                        m_gas_global_fixed = (0.7 * M200_val) * f_gas_global_fixed
-                        
-                        M_bar_tot_fixed = m_stars_tot + m_gas_global_fixed
-                        
-                        ratio_stars_gas_fixed = M_bar_tot_fixed / m_stars_tot
-                        m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
-                        
-                        # --- VECCHIO CALCOLO NFW ---
-                        # M_DM_csv_tot = np.max(M_dm_nfw_arr)
-                        # M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
-                        # true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+                        # 1. Usa la fisica globale dallo slider (nessun raggio proiettato)
+                        _, _, _, dm_ratio_display, _, sigma_sim = compute_cluster_slider_physics(f)
 
-                        # --- NUOVO CALCOLO SOTTRAZIONE VIRIALE ---
-                        # --- NUOVO CALCOLO SOTTRAZIONE VIRIALE ---
-                        sigma_obs_global = cluster_state['sigma_obs']
-                        M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
-                        
-                        # Lasciamo l'array M_dm_at_gal intatto per calcolare le velocità locali della simulazione
-                        M_dm_at_gal = np.maximum(0.0, M_tot_virial - m_bary_tot_at_gal_fixed)
-                        
-                        # Per le percentuali totali del cluster, usiamo l'intero volume M200!
-                        M200_val, _ = estimate_M200_R200_from_sigma(sigma_obs_global, cluster_state['rho_crit'])
-                        M_tot_csv = M200_val
-                        M_DM_csv_tot = np.maximum(0.0, M_tot_csv - M_bar_tot_fixed)
-                        true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
-                        if cluster_state.get('select', '').lower() == 'abell1656(coma).csv':
-                            max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
-                            progress = float(f / S_max) * max_progress
-                        else:
-                            progress = float(f / S_max)
-                        dm_ratio_display = float(progress * true_dm_ratio)
-                        
-                        v_center_bar = np.sqrt(np.maximum(0.0, G_grav * M_bar_tot_fixed / (r200_from_M200(M_bar_tot_fixed, rho_crit) + 1e-12)))
-                        v_mean_obs = np.mean(observed_vel)
-                        if v_mean_obs > v_center_bar:
-                            v_center_tot = v_center_bar + (v_mean_obs - v_center_bar) * progress
-                        else:
-                            v_center_tot = v_mean_obs
-
-                        sigma_fit = np.std(observed_vel)
-                        #counts_model = N_obs * (norm.cdf(bins[1:], loc=v_center_tot, scale=sigma_fit) - norm.cdf(bins[:-1], loc=v_center_tot, scale=sigma_fit))
+                        # 2. Oversampling Monte Carlo 100x centrato in 0 (identico a generate_grids_over_5.py)
+                        oversample = 100
                         rng = np.random.default_rng(seed=42)
-                        v_sim_tot = rng.normal(loc=v_center_tot, scale=sigma_fit, size=len(observed_vel))
-                        counts_model, _ = np.histogram(v_sim_tot, bins=bins)
-                        valid_bins = counts_model > 0
-                        if np.sum(valid_bins) > 1:
+                        v_sim_tot = rng.normal(loc=0.0, scale=sigma_sim, size=len(v_peculiar) * oversample)
+                        pesi_sim = np.ones_like(v_sim_tot) / oversample
+                        counts_model, _ = np.histogram(v_sim_tot, bins=bins, weights=pesi_sim)
+
+                        # 3. Chi-quadrato ridotto su bin validi (E_i >= 0.5) con k = 3 vincoli (N, media, sigma)
+                        valid_bins = counts_model >= 0.5
+                        if np.sum(valid_bins) > 3:
                             chi2_raw = np.sum(((counts_obs[valid_bins] - counts_model[valid_bins])**2) / counts_model[valid_bins])
-                            dof = max(1, np.sum(valid_bins) - 2)
+                            dof = max(1, np.sum(valid_bins) - 3)
                             chi2_val = float(chi2_raw / dof)
                         else:
                             chi2_val = 0.0
-                            
-                        
-                        
-                        
-                        
-                       
-                        #chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
-                        #chi2_val = chi2_hist / max(1, len(counts_obs))
 
+                        # 4. Gestione punti e fit parabolico (logica dell'app invariata)
                         is_duplicate = any(abs(x - dm_ratio_display) < 1e-4 for x, y in cluster_state['chi2_points'])
                         if is_duplicate:
                             cluster_state['chi2_slider_result'] = "Point already added! Move the slider."
                             plot_cluster_chi2_curve()
-                            return  
-                            
+                            return
+
                         cluster_state['chi2_points'].append((dm_ratio_display, chi2_val))
-                        
-                        if len(cluster_state['chi2_points']) > 3: cluster_state['chi2_points'].pop(0)
-                      
+                        if len(cluster_state['chi2_points']) > 3:
+                            cluster_state['chi2_points'].pop(0)
+
                         if len(cluster_state['chi2_points']) == 3:
                             xs, ys = zip(*cluster_state['chi2_points'])
                             coeffs = np.polyfit(xs, ys, 2)
-                            
-                        
+
                             if coeffs[0] > 1e-5:
                                 xmin = -coeffs[1] / (2 * coeffs[0])
-                                ymin = np.polyval(coeffs, xmin) 
-                                
-                              
-                                #ymin_display = max(0.0, ymin)
-                             
+                                ymin = np.polyval(coeffs, xmin)
+
                                 if xmin < 0:
                                     cluster_state['chi2_slider_result'] = "Invalid Result: Ratio cannot be negative!"
                                 elif xmin >= 1.0:
                                     cluster_state['chi2_slider_result'] = "Invalid Result: Ratio cannot exceed 100%!"
                                 elif ymin < 0:
-                                  
                                     cluster_state['chi2_slider_result'] = f"Invalid Fit: χ² min < 0 (≈ {ymin:.2f})"
                                 else:
                                     cluster_state['chi2_slider_result'] = f"Best Fit: DM/Tot ≈ {xmin*100:.1f}%, χ²_min ≈ {ymin:.2f}"
-                            else:    
-                               
-                                cluster_state['chi2_slider_result'] = "Invalid shape. Select 3 points that surrond the minimum!"
+                            else:
+                                cluster_state['chi2_slider_result'] = "Invalid shape. Select 3 points that surround the minimum!"
+                        else:
+                            cluster_state['chi2_slider_result'] = "Add more points to find the minimum."
 
                         plot_cluster_chi2_curve()
-
                     
                         
                     def refresh_cluster_chi2_plot():
@@ -5490,7 +5214,7 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                   
 
                     with ui.column().classes('w-full items-center '):
-                        dm_slider_min, dm_slider_max = 0.0, 60
+                        dm_slider_min, dm_slider_max = 0.0, 2.0
                         ui.label("Move the slider to add dark matter to the simulated velocity distribution in the cluster").props('id=dm_slider_label')
                         dm_slider = aria_slider(min=dm_slider_min, max=dm_slider_max,
                         value=0.0, step=0.01,  aria_label="Dark matter fraction control slider").props('aria-describedby=dm_slider_label label-always')
@@ -5646,6 +5370,7 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                         #select = dataset_selector.value
                 
                     else:
+                        df = get_cluster_data_cached(DEFAULT_CLUSTER)
                         initialize_cluster_from_df(df)
                     recompute_axis_limits()
                     
@@ -5660,92 +5385,27 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                     def on_dataset_change(new_value):
                         if not isinstance(new_value, str):
                             return
-                        
+
                         cluster_state["select"] = new_value
-                        
                         refresh_cluster_chi2_plot()
+
                         if new_value.lower() == "abell1656(coma).csv":
-                            df = load_coma_dataset(new_value)
-                            new_max_clu = 60.0
+                            load_coma_dataset(new_value)
                         else:
                             df = get_cluster_data_cached(new_value)
                             initialize_cluster_from_df(df)
-                            new_max_clu = 10.0
-                        #new_max_clu = 0.99
-                        recompute_axis_limits()
-                        # cluster_name = new_value
-                        
-                        #dm_slider.value = 0.0
-                        sigma_obs = cluster_state['sigma_obs']
-                        
-                       
-                        #new_max_clu = max(5.0, (sigma_obs / 100.0) * 3.0)
-                      
-                        dm_slider.max = round(new_max_clu, 1)
-                        dialog_cluster_dm_slider.max = round(new_max_clu, 1) # Mantiene sincronizzato il MAX
-                        dm_slider.step = round(new_max_clu / 100.0, 2)
-                        dialog_cluster_dm_slider.step = round(new_max_clu / 100.0, 2)
+
                         dm_slider.value = 0.0
                         dialog_cluster_dm_slider.value = 0.0
-                        dm_slider.props(f'max="{new_max_clu}" step="{round(new_max_clu / 100.0, 2)}"')
                         dm_slider.update()
                         dialog_cluster_dm_slider.update()
-                 
-                      
-                        
-                 
+
                         cluster_state['chi2_points'].clear()
                         cluster_state['chi2_slider_result'] = "Add points to find the minimum."
+                        cluster_state["sim_state"] = {}
                         refresh_cluster_plots(full_anim=True)
                         update_cluster_image.refresh()
                         update_cluster_table.refresh()
-                        
-                     
-                        observed_vel = cluster_state['observed_vel']
-                        r_proj_kpc = cluster_state['r_proj_kpc']
-                        m_bary_at_gal = cluster_state['m_bary_at_gal']
-
-                        N_gal = min(80, len(observed_vel))
-                        cluster_radius = 1.0
-                        rng = np.random.default_rng(123)
-
-                        x_init_obs = rng.uniform(-cluster_radius, cluster_radius, N_gal)
-                        y_init_obs = rng.uniform(-cluster_radius, cluster_radius, N_gal)
-
-                        x_init_mod = rng.uniform(-cluster_radius, cluster_radius, N_gal)
-                        y_init_mod = rng.uniform(-cluster_radius, cluster_radius, N_gal)
-
-                        r_safe = np.maximum(r_proj_kpc, 1.0)
-                        M_total_bary = np.maximum(m_bary_at_gal, 1e-6)
-                        sigma_bary = np.sqrt(G_grav * M_total_bary / (3.0 * r_safe))
-                        
-                        indices = rng.choice(len(observed_vel), size=N_gal, replace=False)
-                        
-                        sigma_bary_sub = sigma_bary[indices]
-                        observed_vel_sub = observed_vel[indices]
-                        sigma_obs_val = np.std(observed_vel_sub)
-                        
-                        vx_obs = rng.normal(0.0, sigma_obs_val, N_gal)
-                        vy_obs = rng.normal(0.0, sigma_obs_val, N_gal)
-
-                        vx_model = rng.normal(0.0, sigma_bary_sub, N_gal)
-                        vy_model = rng.normal(0.0, sigma_bary_sub, N_gal)
-
-                   
-                        cluster_state["sim_state"] = {
-                            "x_obs": x_init_obs.copy(),
-                            "y_obs": y_init_obs.copy(),
-                            "x_model": x_init_mod.copy(),
-                            "y_model": y_init_mod.copy(),
-                            "vx_obs": vx_obs.copy(),
-                            "vy_obs": vy_obs.copy(),
-                            "vx_model": vx_model.copy(),
-                            "vy_model": vy_model.copy(),
-                            "rng": rng,
-                            "indices": indices,
-                            "current_dataset": new_value
-                        }
-                    
 
                     #dm_slider.on_value_change(lambda: refresh_cluster_plots(full_anim=False))
                     dm_slider.on('change', lambda e: refresh_cluster_plots(full_anim=False))
@@ -5758,241 +5418,113 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
 
                 
                             
-                    async def update_coma_histogram_v2(token=None,full_anim=True):
-                        
-                    
-                        if token is None: token = plot_state['id']
-                        if token != plot_state['id']: return 
-                        observed_vel = cluster_state['observed_vel']
+                    async def update_coma_histogram_v2(token=None, full_anim=True):
+                        if token is None:
+                            token = plot_state['id']
+                        if token != plot_state['id']:
+                            return
+
+                        v_peculiar = cluster_state['observed_vel_pec']
                         r_proj_kpc = cluster_state['r_proj_kpc']
-                        m_bary_at_gal = cluster_state['m_bary_at_gal']
-                        M200 = cluster_state['M200']
-                        c = cluster_state['c']
-                        rho_crit = cluster_state['rho_crit']
-                        obs_mean = cluster_state['obs_mean']
+                        if len(v_peculiar) == 0:
+                            return
+
                         bins = cluster_state['bins']
-                        counts_obs = cluster_state['counts_obs']
-                        N_obs = cluster_state['N_obs']
+                        x_lim = cluster_state['x_lim']
+                        y_max = cluster_state['y_max']
                         r_max = cluster_state['r_max']
                         r_padding = cluster_state['r_padding']
-                        ylim_max = cluster_state['ylim_max']
-                        x_max = cluster_state['x_max']
-                        padding = cluster_state['padding']
-                        y_max = cluster_state['y_max']
+                        sigma_obs = cluster_state['sigma_obs']
+
                         try:
-        
-                            f = float(dm_slider.value) 
-                            S_max = getattr(dm_slider, 'max', 60.0)
-                            #progress = float(np.clip(f / S_max, 0.0, 1.0))
-                            
-                            
-                            r_safe = np.maximum(r_proj_kpc, 1) 
-                            
-                            # --- VECCHIO CALCOLO NFW (COMMENTATO) ---
-                            # rho_s = cluster_state['rho_s']
-                            # r_s = cluster_state['r_s']
-                            # M_dm_at_gal = M_nfw_enclosed(r_safe, rho_s, r_s)
+                            f = float(dm_slider.value)
 
-                            h = 0.7
-                            m_stars_tot = np.sum(m_bary_at_gal)
-                            
-                          
-                            sigma_obs_global = cluster_state['sigma_obs']
-                            M200_val, _ = estimate_M200_R200_from_sigma(sigma_obs_global, cluster_state['rho_crit'])
-                            
-                            f_gas_global_fixed = 0.093 * (((0.7 * M200_val) / 2e14)**0.21)
-                            m_gas_global_fixed = (0.7 * M200_val) * f_gas_global_fixed
-                            
-                            M_bar_tot_fixed = m_stars_tot + m_gas_global_fixed
-                            
-                            ratio_stars_gas_fixed = M_bar_tot_fixed / m_stars_tot
-                            m_bary_tot_at_gal_fixed = m_bary_at_gal * ratio_stars_gas_fixed
-                            
-                            # --- VECCHIO CALCOLO NFW  ---
-                            # M_DM_csv_tot = np.max(M_dm_at_gal)
-                            # M_tot_csv = M_bar_tot_fixed + M_DM_csv_tot
-                            # true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+                            # 1. Fisica globale dallo slider (nessuna dipendenza da r_proj_kpc)
+                            displayed_M_tot, displayed_M_DM, M_bar_tot_fixed, dm_ratio_display, sigma_bar, sigma_sim = (
+                                compute_cluster_slider_physics(f)
+                            )
 
-                     
-                            sigma_obs_global = cluster_state['sigma_obs']
-                            M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
-                            
-                   
-                            M_dm_at_gal = np.maximum(0.0, M_tot_virial - m_bary_tot_at_gal_fixed)
-                            
-                         
-                            M200_val, _ = estimate_M200_R200_from_sigma(sigma_obs_global, cluster_state['rho_crit'])
-                            M_tot_csv = M200_val
-                            M_DM_csv_tot = np.maximum(0.0, M_tot_csv - M_bar_tot_fixed)
-                            true_dm_ratio = (M_DM_csv_tot / M_tot_csv) if M_tot_csv > 0 else 0.0
+                            # 2. Istogramma: oversampling Monte Carlo 100x centrato in 0
+                            # Usiamo lo stesso z_hist così a slider=0 il verde parte identico e sovrapposto al rosso
+                            oversample = 100
+                            rng_hist = np.random.default_rng(seed=42)
+                            z_hist = rng_hist.normal(loc=0.0, scale=1.0, size=len(v_peculiar) * oversample)
+                            v_bar_hist = z_hist * sigma_bar
+                            v_dm_hist = z_hist * sigma_sim
+                            pesi_over = np.ones_like(z_hist) / oversample
 
-                            
-                            sigma_obs_global = cluster_state['sigma_obs']
-                            M_tot_virial = (3.0 * sigma_obs_global**2 * r_safe) / G_grav
-                            M_dm_at_gal = np.maximum(0.0, M_tot_virial - m_bary_tot_at_gal_fixed)
-                            
-                            
-                            if cluster_state.get('select', '').lower() == 'abell1656(coma).csv':
-                                max_progress = 0.99 / true_dm_ratio if true_dm_ratio > 0 else 1.0
-                                progress = float(f / S_max) * max_progress
-                            else:
-                                progress = float(f / S_max)
-                            dm_ratio_display = progress * true_dm_ratio
-                            
-                            M_total_at_gal = np.maximum(m_bary_tot_at_gal_fixed + progress * M_dm_at_gal, 1e-6)
-                        
-                            sigma_los_loc = np.sqrt(np.maximum(0.0, G_grav * M_total_at_gal / (3.0 * r_safe))) 
-                            sigma_fit = np.std(observed_vel) 
-                            
-                           
-                            v_center_bar = np.sqrt(np.maximum(0.0, G_grav * M_bar_tot_fixed / (r200_from_M200(M_bar_tot_fixed, rho_crit) + 1e-12)))
-                            v_mean_obs = np.mean(observed_vel)
-                            
-                            if v_mean_obs > v_center_bar:
-                                v_center_tot = v_center_bar + (v_mean_obs - v_center_bar) * progress
-                            else:
-                                v_center_tot = v_mean_obs
+                            # 3. Scatter plot: esattamente N punti abbinati a r_proj_kpc, centrati in 0
+                            # Con lo stesso z_scat i punti verdi partono sopra i rossi e si espandono con lo slider
+                            rng_scat = np.random.default_rng(seed=42)
+                            z_scat = rng_scat.normal(loc=0.0, scale=1.0, size=len(v_peculiar))
+                            v_bar_scat = z_scat * sigma_bar
+                            v_dm_scat = z_scat * sigma_sim
 
-                            rng = np.random.default_rng(seed=42)
-                            v_bar = rng.normal(loc=v_center_bar, scale=sigma_fit, size=len(r_proj_kpc))
-                            v_dm  = rng.normal(loc=v_center_tot, scale=sigma_fit, size=len(r_proj_kpc))
-                            
-                            sigma_bar = np.sqrt(np.maximum(0.0, G_grav * m_bary_tot_at_gal_fixed / (3.0 * r_safe)))
-                            
-                            obs_sub = observed_vel[::max(1, len(observed_vel)//20)]
-                            bar_sub = sigma_bar[::max(1, len(sigma_bar)//20)] 
-                            sim_sub = sigma_los_loc[::max(1, len(sigma_los_loc)//20)]
+                            # 4. Sonificazione (aggiornamento variabili JS per Audio Tools)
+                            obs_sub = v_peculiar[::max(1, len(v_peculiar) // 20)]
+                            sigma_obs_series = [float(abs(v)) for v in obs_sub if np.isfinite(v)]
+                            sigma_bar_series = [float(sigma_bar)] * len(sigma_obs_series)
+                            sigma_sim_list = [float(sigma_sim)] * len(sigma_obs_series)
+                            sigma_diff_series = np.abs(np.array(sigma_obs_series) - np.array(sigma_sim_list))
+                            sigma_diff_mean = float(np.mean(sigma_diff_series)) if len(sigma_diff_series) > 0 else 0.0
 
-                            sigma_obs_series = [float(abs(v - obs_mean)) for v in obs_sub if np.isfinite(v)]
-                            sigma_bar_series = [float(s) for s in bar_sub if np.isfinite(s)]
-                            sigma_sim_list = [float(s) for s in sim_sub if np.isfinite(s)]
+                            ui.run_javascript(f"""
+                                window.sigmaObsSeries = {sigma_obs_series};
+                                window.sigmaBarSeries = {sigma_bar_series};
+                                window.sigmaSimSeries = {sigma_sim_list};
+                                window.sigmaObsVal = {float(sigma_obs)};
+                                window.sigmaBarVal = {float(sigma_bar)};
+                                window.sigmaSimVal = {float(sigma_sim)};
+                                window.sigmaDiffSeries = {sigma_diff_series.tolist()};
+                                window.sigmaDiffMean = {sigma_diff_mean};
+                            """)
 
-
-                            sigma_obs_val = float(np.std(observed_vel))
-                            sigma_bar_val = float(np.nanmean(sigma_bar))
-                            sigma_sim_val = float(np.nanmean(sigma_los_loc))
-                            min_len = min(len(sigma_obs_series), len(sigma_sim_list))
-                            sigma_diff_series = np.abs(np.array(sigma_obs_series[:min_len]) - np.array(sigma_sim_list[:min_len]))
-                            sigma_diff_series_list = sigma_diff_series.tolist()
-                            sigma_diff_mean = np.mean(sigma_diff_series)
-
-                            ui.run_javascript(f"window.sigmaObsSeries = {sigma_obs_series};")
-                            ui.run_javascript(f"window.sigmaBarSeries = {sigma_bar_series};")
-                            ui.run_javascript(f"window.sigmaSimSeries = {sigma_sim_list};")
-                            ui.run_javascript(f"window.sigmaObsVal = {sigma_obs_val};")
-                            ui.run_javascript(f"window.sigmaBarVal = {sigma_bar_val};")
-                            ui.run_javascript(f"window.sigmaSimVal = {sigma_sim_val};")
-                            ui.run_javascript(f"window.sigmaDiffSeries = {sigma_diff_series_list};")
-                            ui.run_javascript(f"window.sigmaDiffMean = {sigma_diff_mean};") 
-
-
-                    
-
-
-
-                            
-                            
-                            counts_model, _ = np.histogram(v_dm, bins=bins)
-                            if counts_model.sum() > 0:
-                                counts_model = counts_model / counts_model.sum() * N_obs
-                
-                        
-                        
-                            valid_bins = counts_model > 0
-                            if np.sum(valid_bins) > 1:
-                                chi2_raw = np.sum(((counts_obs[valid_bins] - counts_model[valid_bins])**2) / counts_model[valid_bins])
-                                dof = max(1, np.sum(valid_bins) - 2)
-                                chi2_norm = chi2_raw / dof
-                            else:
-                                chi2_norm = 0.0
-                            #chi2_hist = np.sum(((np.log1p(counts_obs) - np.log1p(counts_model))**2))
-                            #chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0))
-                            #chi2_hist = np.sum(((counts_obs - counts_model)**2) / np.maximum(counts_model, 1.0)**2)
-                            #chi2_norm = chi2_hist / len(counts_obs)
-                            
-                            
-                            v_mean_val = np.mean(observed_vel)
-                            sigma_obs = np.std(observed_vel)
-                            v_model_mean = np.mean(v_dm)
-                            v_model_sigma = np.std(v_dm)
-                            peak_obs = counts_obs.max()
-                            peak_model = counts_model.max()
-
-
-
-
-
-                            
-                            sigma_bar_val = sigma_bar.mean()
-                            sigma_dm_val = sigma_los_loc.mean()
-
-                            N_sim = len(v_dm) 
-                            N_bar=len(v_bar)
-                            M_dm_mean = np.mean(f * M_dm_at_gal)
-                            dm_fraction = np.mean((f * M_dm_at_gal) / M_total_at_gal)
-
-
-
-                        
-
-
-
-                            #mass_ratio = M_tot / M_bar_tot_fixed
-                            counts_dm, _ = np.histogram(v_dm, bins=bins)
-                            counts_dm = counts_dm / counts_dm.sum() * N_obs
-                            chi2_scatter = np.sum(((np.log1p(counts_obs) - np.log1p(counts_dm))**2))
-
-                            chi2_scatter_norm = chi2_scatter / len(counts_obs)
-
-
-                          
-                       
-                            M_DM_current = f * M200
-
-                         
-                            #dm_ratio = M_DM_current / M_tot if M_tot > 0 else 0.0
-
-                            # Aggiorna slider ed etichette
+                            # 5. Aggiornamento etichetta slider, pannello informativo e immagine
                             dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio_display * 100:.1f}%"')
-                            
+
                             select_name = cluster_state.get("select", "Abell1656(Coma).csv")
                             clean_name = select_name.removesuffix('.csv').removesuffix('.txt').removesuffix('.dat')
                             cluster_title_label.set_text(f"Cluster Info: {clean_name}")
-                          
+
                             cluster_info_content.clear()
                             with cluster_info_content:
-                                displayed_M_tot = M_bar_tot_fixed + progress * M_DM_csv_tot
-                                displayed_M_DM = progress * M_DM_csv_tot
-                                
                                 html_info_box(f"""
                                     <ul class="list-none pl-2 space-y-1 text-sm text-gray-800">
                                         <li><b>M<sub>tot</sub>:</b> {format_sci(displayed_M_tot)} M<sub>☉</sub></li>
                                         <li><b>M<sub>DM</sub>:</b> {format_sci(displayed_M_DM)} M<sub>☉</sub> <span style="color: #0284c7; font-weight: bold;">({dm_ratio_display*100:.1f}%)</span></li>
                                         <li><b>M<sub>bar</sub>:</b> {format_sci(M_bar_tot_fixed)} M<sub>☉</sub></li>
                                         <li><b>σ<sub>obs</sub>:</b> {sigma_obs:.1f} km/s</li>
-                                        <li><b>σ<sub>sim</sub>:</b> {sigma_los_loc.mean():.1f} km/s</li>
+                                        <li><b>σ<sub>sim</sub>:</b> {sigma_sim:.1f} km/s</li>
                                     </ul>
                                 """)
-                            select_name = cluster_state["select"]
-                            img_name = "coma_img.jpg" if select_name.lower() == "abell1656(coma).csv" else os.path.splitext(select_name)[0] + ".jpg"
+
+                            img_name = (
+                                "coma_img.jpg"
+                                if select_name.lower() == "abell1656(coma).csv"
+                                else os.path.splitext(select_name)[0] + ".jpg"
+                            )
                             if os.path.exists(os.path.join(CLUSTER_IMG_PATH, img_name)):
                                 cluster_img_display.source = f"/cluster_img/{img_name}"
                             else:
                                 cluster_img_display.source = ""
-                            sort_idx = np.argsort(r_proj_kpc)
-        
-                            r_sorted = r_proj_kpc[sort_idx]
-                            obs_vel_sorted = observed_vel[sort_idx]
-                            v_bar_sorted = v_bar[sort_idx]
-                            v_dm_sorted = v_dm[sort_idx]
 
-                      
-                            n_chunks = 10     
+                            # Ordinamento radiale SOLO per lo scatter plot e l'animazione progressiva
+                            sort_idx = np.argsort(r_proj_kpc)
+                            r_sorted = r_proj_kpc[sort_idx]
+                            obs_vel_sorted = v_peculiar[sort_idx]
+                            v_bar_scat_sorted = v_bar_scat[sort_idx]
+                            v_dm_scat_sorted = v_dm_scat[sort_idx]
+
+                            n_chunks = 10
                             chunk_size = int(np.ceil(len(r_sorted) / n_chunks))
                             sleep_time = 0.15
 
-                            def render_frame(current_obs, current_bar, current_dm, 
-                                            curr_r_obs, curr_r_bar, curr_r_dm):
+                            def render_frame(
+                                current_obs, current_bar_scat, current_dm_scat,
+                                curr_r_obs, curr_r_bar, curr_r_dm,
+                                curr_bar_hist, curr_bar_w,
+                                curr_dm_hist, curr_dm_w
+                            ):
                                 try:
                                     with plot_container_histo:
                                         plot_container_histo.clear()
@@ -6000,132 +5532,116 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                         with ui.pyplot(figsize=(6, 4)):
                                             ax = plt.gca()
                                             ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
-                                            ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
-                                          
-                                            plt.hist(current_obs, bins=bins, alpha=1.0,color='blue', orientation='horizontal',
-                        label='Observed Velocities', 
-                        rasterized=True)
-                
-                                            if len(current_dm) > 0:
-                                        
-                                                plt.hist(current_dm, bins=bins, alpha=0.7, color='green', orientation='horizontal',
-                                                        label='Simulated Velocities' , 
-                                                        rasterized=True)
-                                            
-                                            if len(current_bar) > 0:
-                                            
-                                                plt.hist(current_bar, bins=bins, alpha=0.6, color='red', orientation='horizontal',
-                                                        label='Baryonic Component', 
-                                                        rasterized=True)
-                                                
-                                            
-                                           
+                                            ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
+
+                                            plt.hist(
+                                                current_obs, bins=bins, alpha=1.0, color='blue',
+                                                orientation='horizontal', label='Observed Velocities',
+                                                rasterized=True
+                                            )
+                                            if len(curr_dm_hist) > 0:
+                                                plt.hist(
+                                                    curr_dm_hist, bins=bins, weights=curr_dm_w,
+                                                    alpha=0.7, color='green', orientation='horizontal',
+                                                    label='Simulated Velocities', rasterized=True
+                                                )
+                                            if len(curr_bar_hist) > 0:
+                                                plt.hist(
+                                                    curr_bar_hist, bins=bins, weights=curr_bar_w,
+                                                    alpha=0.6, color='red', orientation='horizontal',
+                                                    label='Baryonic Component', rasterized=True
+                                                )
+
+                                            plt.axhline(0.0, color='gray', linestyle=':', linewidth=1, alpha=0.7)
                                             plt.xlim(0, float(y_max))
-                                            #plt.yscale('log')
-                                            plt.ylim(0, float(x_max + padding))
-                                            plt.ylabel('Velocity [km/s]',fontsize=10)
-                                            plt.xlabel('N° of Galaxies',fontsize=10)
-                                            #if cluster_name is not None:
-                                            #    plt.title(f'Galaxy Velocity Distribution ({cluster_name})')
-                                            #else:
-                                            #    plt.title('Galaxy Velocity Distribution (Cluster)')
-                                            plt.title('Histogram of velocities distribution ',fontsize=12,fontweight='bold')
-                                            plt.legend(fontsize=10, loc='upper left')
+                                            plt.ylim(-float(x_lim), float(x_lim))
+                                            plt.ylabel('Peculiar Velocity [km/s]', fontsize=10)
+                                            plt.xlabel('N° of Galaxies', fontsize=10)
+                                            plt.title('Histogram of velocities distribution', fontsize=12, fontweight='bold')
+                                            plt.legend(fontsize=10, loc='upper right')
                                             plt.tight_layout()
                                             plt.grid(True, axis='y', linestyle='--', alpha=0.7)
                                             ui.element('div').props(
-            'role=status aria-live=polite tabindex=0 aria-label=Histogram showing the observed velocities of galaxies in the Coma cluster in blue,the baryonic component in red and the simulated velocities in green, which depend on the dark matter fraction set by the slider'
-            )
-
-                                
+                                                'role=status aria-live=polite tabindex=0 aria-label=Histogram showing the observed peculiar velocities of galaxies in the cluster in blue, the baryonic component in red and the simulated velocities in green, which depend on the dark matter fraction set by the slider'
+                                            )
 
                                     with plot_container_scatter:
                                         plot_container_scatter.clear()
-                                        #plt.close()
                                         with ui.pyplot(figsize=(6, 4)):
-                                    
-                                        
                                             ax = plt.gca()
                                             ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
-                                            ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+                                            ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
                                             ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
-                                            ax.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-                                            plt.scatter(curr_r_obs, current_obs, s=10, color='blue', alpha=0.6, label="Observed Galaxies", rasterized=True)
+                                            ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
 
-                                            plt.scatter(curr_r_bar, current_bar, s=10, color='red', alpha=0.6, 
-                            label='Baryonic Component'   , 
-                            rasterized=True)
-                
+                                            plt.scatter(curr_r_obs, current_obs, s=10, color='blue', alpha=0.6, label='Observed Galaxies', rasterized=True)
+                                            plt.scatter(curr_r_bar, current_bar_scat, s=10, color='red', alpha=0.6, label='Baryonic Component', rasterized=True)
+                                            plt.scatter(curr_r_dm, current_dm_scat, s=10, color='green', alpha=0.6, label='Simulated Galaxies', rasterized=True)
 
-                                            plt.scatter(curr_r_dm, current_dm, s=10, color='green', alpha=0.6, 
-                            label="Simulated Galaxies" , 
-                            rasterized=True)
-
-                                    
-                                            
-                                            
-
+                                            plt.axhline(0.0, color='gray', linestyle=':', linewidth=1, alpha=0.7)
                                             plt.xlim(0, r_max + r_padding)
-                                            #plt.axvline(cluster_state['R200'], color='gray', linestyle='--', alpha=0.7, label='$R_{200}$')
-                                            plt.ylim(0, ylim_max)
-
-                                            plt.xlabel("Radius [kpc]",fontsize=10)
-                                            plt.ylabel("Velocity [km/s]",fontsize=10)
-                                            #if cluster_name is not None:
-                                            #    plt.title(f"Phase-space diagram of cluster galaxies ({cluster_name})")
-                                            #else:
-                                            #    plt.title("Phase-space diagram of cluster galaxies")
-                                            plt.title("Cluster galaxies velocities",fontsize=12,fontweight='bold')
-                                            plt.legend(fontsize=10, loc='upper left')
-                                            plt.grid(True, linestyle="--", alpha=0.7)
-                                            
-                                            
-                                            
+                                            plt.ylim(-float(x_lim), float(x_lim))
+                                            plt.xlabel('Projected Radius [kpc]', fontsize=10)
+                                            plt.ylabel('Peculiar Velocity [km/s]', fontsize=10)
+                                            plt.title('Cluster galaxies velocities', fontsize=12, fontweight='bold')
+                                            plt.legend(fontsize=10, loc='upper right')
+                                            plt.grid(True, linestyle='--', alpha=0.7)
+                                            plt.tight_layout()
                                             ui.element('div').props(
-            'role=status aria-live=polite tabindex=0 aria-label=Scatter plot showing the observed velocities of galaxies in the Coma cluster in blue,the baryonic component in red and the simulated velocities in green, which depend on the dark matter fraction set by the slider'
-            )
-                               
-                                except Exception:
-                                       
-                                        return
+                                                'role=status aria-live=polite tabindex=0 aria-label=Scatter plot showing the observed peculiar velocities of galaxies in the cluster in blue, the baryonic component in red and the simulated velocities in green, which depend on the dark matter fraction set by the slider'
+                                            )
+                                except Exception as ex:
+                                    print(f"Render error in update_coma_histogram_v2: {ex}")
+                                    return
+
                             if full_anim:
-                             
                                 for i in range(1, n_chunks + 1):
-                                    if token != plot_state['id']: return 
+                                    if token != plot_state['id']:
+                                        return
                                     limit = i * chunk_size
-                                    render_frame(obs_vel_sorted[:limit], [], [], 
-                                                 r_sorted[:limit], [], [])
+                                    render_frame(
+                                        obs_vel_sorted[:limit], [], [],
+                                        r_sorted[:limit], [], [],
+                                        [], [], [], []
+                                    )
                                     await asyncio.sleep(sleep_time)
 
                                 for i in range(1, n_chunks + 1):
-                                    if token != plot_state['id']: return 
+                                    if token != plot_state['id']:
+                                        return
                                     limit = i * chunk_size
-                                    render_frame(obs_vel_sorted, v_bar_sorted[:limit], [], 
-                                                 r_sorted, r_sorted[:limit], [])
+                                    limit_over = limit * oversample
+                                    render_frame(
+                                        obs_vel_sorted, v_bar_scat_sorted[:limit], [],
+                                        r_sorted, r_sorted[:limit], [],
+                                        v_bar_hist[:limit_over], pesi_over[:limit_over],
+                                        [], []
+                                    )
                                     await asyncio.sleep(sleep_time)
-                            
-                          
+
                                 for i in range(1, n_chunks + 1):
-                                    if token != plot_state['id']: return 
+                                    if token != plot_state['id']:
+                                        return
                                     limit = i * chunk_size
-                                    render_frame(obs_vel_sorted, v_bar_sorted, v_dm_sorted[:limit], 
-                                                r_sorted, r_sorted, r_sorted[:limit])
-                                
-                                    pause = sleep_time if full_anim else 0.01 
-                                    await asyncio.sleep(pause)
-                        
+                                    limit_over = limit * oversample
+                                    render_frame(
+                                        obs_vel_sorted, v_bar_scat_sorted, v_dm_scat_sorted[:limit],
+                                        r_sorted, r_sorted, r_sorted[:limit],
+                                        v_bar_hist, pesi_over,
+                                        v_dm_hist[:limit_over], pesi_over[:limit_over]
+                                    )
+                                    await asyncio.sleep(sleep_time)
                             else:
-                               
-                                render_frame(obs_vel_sorted, v_bar_sorted, v_dm_sorted, r_sorted, r_sorted, r_sorted)
+                                render_frame(
+                                    obs_vel_sorted, v_bar_scat_sorted, v_dm_scat_sorted,
+                                    r_sorted, r_sorted, r_sorted,
+                                    v_bar_hist, pesi_over,
+                                    v_dm_hist, pesi_over
+                                )
 
-                        except Exception:
-                           
+                        except Exception as ex:
+                            print(f"Error in update_coma_histogram_v2: {ex}")
                             return
-                       
-                        
-
-                 
-                    #ui.timer(dt, update_cluster_points)
 
 
 
@@ -6185,106 +5701,66 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
 
                         df = get_cluster_data_cached(selected_file)
 
-                        H0 = 73.0
-                        G = 4.302e-6
-                        M_sun_B = 5.48
-                        MLR_B = 5.0
-                        FIXED_DISTANCE_MPC = None
+                        if df is None or df.empty:
+                            return
 
+                        is_coma = "coma" in selected_file.lower()
                         members = df.copy()
-                        # sigma clipping
-                        for _ in range(5):
-                            if "RV" not in members.columns and "redshift" in members.columns:
-                                members["RV"] = members["redshift"] * c_light
-                            
-                            v_rel = members["RV"] - np.median(members["RV"])
-                            mad = np.median(np.abs(v_rel))
-                            sigma = 1.4826 * mad if mad > 0 else np.std(v_rel)
-                            mask = np.abs(v_rel) <= 3 * sigma
-                            new_members = members[mask]
-                            if len(new_members) == len(members):
-                                break
-                            members = new_members
+                        if "RV" not in members.columns and "redshift" in members.columns:
+                            members["RV"] = members["redshift"] * c_light
+                        if not is_coma and "bmag" in members.columns:
+                            members = members[members["bmag"] > 0.0]
 
+                        members = filter_cluster_members(members, vel_col="RV")
                         if len(members) < 5:
                             ui.label(f"Not enough valid galaxies in {selected_file}.").classes('text-orange-500')
                             return
 
-                        cluster_distance = float(FIXED_DISTANCE_MPC) if FIXED_DISTANCE_MPC else np.median(members["RV"]) / H0
-                        z_cluster = np.nanmedian(members["RV"] / c_light)
-                        rho_crit = rho_crit_Msunkpc3(H0)
+                        observed_vel = members["RV"].values
+                        cluster_distance_Mpc = float(np.median(observed_vel)) / 73.0
+                        z_cluster = float(np.nanmedian(members["redshift"].values)) if is_coma else float(np.nanmedian(observed_vel / c_light))
+                        rho_crit = rho_crit_Msunkpc3(73.0)
 
-                        mean_ra, mean_dec = members["RAdeg"].mean(), members["DEdeg"].mean()
-                        ang_sep = np.sqrt(((members["RAdeg"] - mean_ra) * np.cos(np.radians(mean_dec)))**2 +
-                                        (members["DEdeg"] - mean_dec)**2)
-                        r_kpc = cluster_distance * 1000 * np.radians(ang_sep)
-                        members = members.assign(r_kpc=r_kpc).replace([np.inf, -np.inf], np.nan).dropna(subset=["r_kpc"])
-                        
-                        r = members["r_kpc"].values
-
-                        D_pc = cluster_distance * 1e6
-                        dist_mod = 5*np.log10(D_pc) - 5
-                        
-                        # Supporto sia per Coma (modelmag_r) che Abell (bmag)
-                        mag_col = 'modelmag_r' if 'modelmag_r' in members.columns else 'bmag'
-                        ext_val = members['extinction_r'].values if 'extinction_r' in members.columns else 0.0
-                        ref_mag = 4.67 if "coma" in selected_file.lower() else 5.48
-                        MLR = 2.0 if "coma" in selected_file.lower() else 5.0
-                        
-                        M_abs = members[mag_col].values - ext_val - dist_mod
-                        L_B_np = 10**(-0.4*(M_abs - ref_mag))
-
-                        order = np.argsort(r)
-                        r_sorted = r[order]
-                        observed_vel_sorted = members["RV"].values[order]
-
-                        L_cum = np.cumsum(L_B_np[order])
-                        M_lum_r = MLR * L_cum
-
-                        if "coma" in selected_file.lower():
-                            sigma_global = np.std(observed_vel_sorted)
+                        if is_coma:
+                            m_star_arr = stellar_mass_from_r_mag(members["modelmag_r"].values, members["extinction_r"].values, z_cluster, M_to_L_ratio=2.0)
                         else:
-                            sigma_global = np.std(observed_vel_sorted - np.median(observed_vel_sorted))
-                        
-                        M200, R200 = estimate_M200_R200_from_sigma(sigma_global, rho_crit)
-                        M_tot = M200
-                        
-                        f_gas_global = 0.093 * (((0.7 * M_tot) / 2e14)**0.21)
-                        m_gas_r_local = (0.7 * (3.0 * sigma_global**2 * r_sorted) / G) * f_gas_global
-                        M_baryonic_r = M_lum_r + m_gas_r_local
-                        
-                        # Generazione distribuzioni normali simulate
-                        rng = np.random.default_rng(seed=42)
-                        v_mean_obs = np.mean(observed_vel_sorted)
-                        sigma_mean_obs = np.std(observed_vel_sorted)
-                        
-                        sigma_bar_local = np.sqrt(np.maximum(1e-6, G * M_baryonic_r / (3.0 * r_sorted)))
-                        v_bar = rng.normal(loc=sigma_bar_local, scale=sigma_mean_obs, size=len(r_sorted))
-                        v_sim_tot = rng.normal(loc=v_mean_obs, scale=sigma_global, size=len(r_sorted))
+                            m_star_arr = stellar_mass_from_B_mag(members["bmag"].values, cluster_distance_Mpc, M_to_L_ratio=5.0)
 
-                        x_max = observed_vel_sorted.max()
-                        padding = 0.15 * x_max
-                        bins = np.linspace(0, x_max + padding, 50)
+                        M_star_tot = float(np.sum(m_star_arr))
+                        sigma_global = float(np.std(observed_vel))
+                        M_tot, R200 = estimate_M200_R200_from_sigma(sigma_global, rho_crit)
+
+                        f_gas_global = 0.093 * (((0.7 * M_tot) / 2e14)**0.21)
+                        M_gas_tot = float((0.7 * M_tot) * f_gas_global)
+                        sigma_bar = float(np.sqrt((G_grav * (M_star_tot + M_gas_tot)) / (3.0 * R200)))
+
+                        v_peculiar = observed_vel - np.mean(observed_vel)
+                        oversample = 100
+                        rng = np.random.default_rng(seed=42)
+                        v_sim_tot = rng.normal(loc=0.0, scale=sigma_global, size=len(v_peculiar) * oversample)
+                        v_bar = rng.normal(loc=0.0, scale=sigma_bar, size=len(v_peculiar) * oversample)
+                        pesi = np.ones_like(v_sim_tot) / oversample
+
+                        x_lim = max(float(np.abs(v_peculiar).max()), 3.5 * sigma_global) * 1.10
+                        bins = np.linspace(-x_lim, x_lim, 40)
 
                         with cluster_popup_container:
                             with ui.row().classes('w-full justify-center gap-8 flex-wrap'):
                                 with ui.pyplot(figsize=(8, 6)):
                                     import matplotlib.ticker as ticker
                                     ax = plt.gca()
-                                    ax.hist(observed_vel_sorted, bins=bins, alpha=0.4, color='blue', label='Observations')
-                                    ax.hist(v_bar, bins=bins, histtype='step', linewidth=2, color='red', label='Baryonic')
-                                    ax.hist(v_sim_tot, bins=bins, histtype='step', linewidth=3, color='green', label='Total Simulated')
-                                    
+                                    ax.hist(v_peculiar, bins=bins, alpha=0.4, color='blue', label='Observations')
+                                    ax.hist(v_bar, bins=bins, weights=pesi, histtype='step', linewidth=2, color='red', label='Baryonic')
+                                    ax.hist(v_sim_tot, bins=bins, weights=pesi, histtype='step', linewidth=3, color='green', label='Total Simulated')
                                     ax.set_title(f"{os.path.splitext(selected_file)[0]}", fontsize=14, fontweight='bold')
                                     ax.set_xlabel('Velocity (km/s)', fontsize=12)
                                     ax.set_ylabel('Number of Galaxies', fontsize=12)
-                                    ax.set_xlim(0, x_max + padding)
+                                    ax.set_xlim(-x_lim, x_lim)
                                     ax.legend(fontsize=11)
                                     ax.grid(True, axis='y', linestyle='--', alpha=0.5)
-                                    
                                     ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
                                     ax.yaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
-                                    ax.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
+                                    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
                     def open_cluster_analysis_dialog():
                         global cluster_popup_container
                         
@@ -6453,35 +5929,20 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
             .math-den { padding-top: 2px; }
         </style>
 
-        <h3>Computational Notes</h3>
-
-
-
-        <ul>
-
-            <li><b>Step 1:</b> Compute angular separation (radians):<br> <span class="math">\( \Delta \theta \)</span></li>
-
-            <li><b>Step 2:</b> Compute radius (<span class="math">\( D = 100 \,\mathrm{Mpc} \)</span>):<br> <span class="math">\( r = D \cdot \Delta \theta \)</span> (kpc)</li>
-
-            <li><b>Step 3:</b> Compute observed velocity:<br> <span class="math">\( v_i = c \, z_i \)</span></li>
-
-            <li><b>Step 4:</b> Distance modulus:<br> <span class="math">\( \text{distmod} = 5 \log_{10}(D_{\mathrm{pc}}) - 5 \)</span></li>
-
-            <li><b>Step 5:</b> Absolute magnitude:<br> <span class="math">\( M_{\mathrm{abs}} = b_{\mathrm{mag}} - \text{distmod} \)</span></li>
-
-            <li><b>Step 6:</b> Luminosity (<span class="math">\( M_{\odot,B} = 5.48 \)</span>):<br> <span class="math">\( L_B = 10^{-0.4 (M_{\mathrm{abs}} - M_{\odot,B})} \)</span></li>
-
-            <li><b>Step 7:</b> Total cluster luminosity:<br> <span class="math">\( L_r = \sum_i L_{B,i} \)</span></li>
-
-            <li><b>Step 8:</b> Stars mass (<span class="math">\( M/L = 5 \)</span>):<br> <span class="math">\( M_{\mathrm{stars}} = (M/L) \cdot L_r \)</span></li>
-
-           
-
-<li><b>Step 9:</b> Gas mass (Giodini, 2009 adapted for \(M_{200}\)):<br> <span class="math">\( M_{\mathrm{gas}} = (0.7 M_{200}) \cdot 0.093 \left( \frac{0.7 M_{200}}{2 \cdot 10^{14}} \right)^{0.21}\)</span></li>
-
-    <li><b>Step 10:</b> Total Baryonic Mass:<br> <span class="math">\( M_{\mathrm{lum}} = M_{\mathrm{stars}} + M_{\mathrm{gas}} \)</span></li>
-
- </ul>
+       <h3>Computational Notes</h3>
+      <ul>
+          <li><b>Step 1:</b> Filter cluster members using a \( \pm 6000\,\mathrm{km/s} \) window around the velocity peak followed by iterative \( 3\sigma_{\mathrm{MAD}} \) clipping (Beers et al., 1990).</li>
+          <li><b>Step 2:</b> Compute cluster distance from the linear Hubble law (\( H_0 = 73\,\mathrm{km\,s^{-1}\,Mpc^{-1}} \)):<br>
+              <span class="math">\( D_L \approx \frac{\mathrm{median}(v)}{H_0} \)</span> (Mpc) and distance modulus <span class="math">\( \mu = 5 \log_{10}(D_{\mathrm{pc}}) - 5 \)</span>.</li>
+          <li><b>Step 3:</b> Compute stellar mass from galaxy magnitudes:<br>
+              <b>SARS Abell (B-band):</b> <span class="math">\( M_B = m_B - \mu, \; L_B = 10^{-0.4(M_B - 5.48)}, \; M_{\mathrm{stars}} = 5.0 \sum_i L_{B,i} \)</span><br>
+              <b>Coma (r-band):</b> <span class="math">\( M_r = m_r - A_r - \mu, \; L_r = 10^{0.4(4.67 - M_r)}, \; M_{\mathrm{stars}} = 2.0 \sum_i L_{r,i} \)</span></li>
+          <li><b>Step 4:</b> Compute global velocity dispersion <span class="math">\( \sigma_{\mathrm{obs}} \)</span> and solve the Virial Theorem with \( \rho_{\mathrm{crit}} = \frac{3H_0^2}{8\pi G} \) to obtain <span class="math">\( M_{200} \)</span> and <span class="math">\( R_{200} \)</span>.</li>
+          <li><b>Step 5:</b> Gas mass (Giodini et al., 2009, with \( M_{500} \approx 0.7 M_{200} \)):<br>
+              <span class="math">\( M_{\mathrm{gas}} = (0.7 M_{200}) \cdot 0.093 \left( \frac{0.7 M_{200}}{2 \times 10^{14}\,M_\odot} \right)^{0.21} \)</span></li>
+          <li><b>Step 6:</b> Total baryonic and Dark Matter mass:<br>
+              <span class="math">\( M_{\mathrm{lum}} = M_{\mathrm{stars}} + M_{\mathrm{gas}}, \quad M_{\mathrm{DM}} = M_{200} - M_{\mathrm{lum}} \)</span></li>
+      </ul>
 
 
 
@@ -6491,21 +5952,21 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
 
         <ul>
 
-            <li><b>Step 9:</b> Gravitational potential energy: <span class="math">\( U(r) = - \frac{G M m}{r} \)</span></li>
+            <li><b>Step 7:</b> Gravitational potential energy: <span class="math">\( U(r) = - \frac{G M m}{r} \)</span></li>
 
-            <li><b>Step 10:</b> Gravitational force: <span class="math">\( F_{\mathrm{grav}} = \frac{G M m}{r^2} \)</span></li>
+            <li><b>Step 8:</b> Gravitational force: <span class="math">\( F_{\mathrm{grav}} = \frac{G M m}{r^2} \)</span></li>
 
-            <li><b>Step 11:</b> Centripetal force: <span class="math">\( F_{\mathrm{cent}} = \frac{m v^2}{r} \)</span></li>
+            <li><b>Step 9:</b> Newton 2nd law force (for circular motion): <span class="math">\( F_{\mathrm{newton}} = \frac{m v^2}{r} \)</span></li>
 
-            <li><b>Step 12:</b> Equating forces: <span class="math">\( v^2(r) = \frac{G M}{r} \)</span></li>
+            <li><b>Step 10:</b> Equating: <span class="math">\( v^2(r) = \frac{G M}{r} \)</span></li>
 
-            <li><b>Step 13:</b> Kinetic energy: <span class="math">\( K = \tfrac{1}{2} m v^2 = \tfrac{1}{2} \frac{G M m}{r} \)</span></li>
+            <li><b>Step 11:</b> Kinetic energy: <span class="math">\( K = \tfrac{1}{2} m v^2 = \tfrac{1}{2} \frac{G M m}{r} \)</span></li>
 
-            <li><b>Step 14:</b> Relation K vs U: <span class="math">\( K = -\tfrac{1}{2} U \)</span></li>
+            <li><b>Step 12:</b> Relation K vs U: <span class="math">\( K = -\tfrac{1}{2} U \)</span></li>
 
-            <li><b>Step 15:</b> Virial theorem: <span class="math">\( 2K + U = 0 \)</span></li>
+            <li><b>Step 13:</b> Virial theorem: <span class="math">\( 2K + U = 0 \)</span></li>
 
-            <li><b>Step 16:</b> System treated as <span class="math">\( N \)</span> light particles orbiting a heavy center of mass.</li>
+            <li><b>Step 14:</b> System treated as <span class="math">\( N \)</span> a satellite orbiting a planet.</li>
 
         </ul>
 
@@ -6515,11 +5976,11 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
 
         <ul>
 
-            <li><b>Step 17:</b> 1-D velocity dispersion: <span class="math">\( \sigma_v = \sqrt{\tfrac{1}{N} \sum_{i=0}^N (v_i - \bar{v})^2} \)</span></li>
+            <li><b>Step 15:</b> 1-D velocity dispersion: <span class="math">\( \sigma_v = \sqrt{\tfrac{1}{N} \sum_{i=0}^N (v_i - \bar{v})^2} \)</span></li>
 
-            <li><b>Step 18:</b> 3-D velocity dispersion (isotropic): <span class="math">\( \sigma_{3D} = \sqrt{3} \, \sigma_v \)</span></li>
+            <li><b>Step 16:</b> 3-D velocity dispersion (isotropic): <span class="math">\( \sigma_{3D} = \sqrt{3} \, \sigma_v \)</span></li>
 
-            <li><b>Step 19:</b> Total cluster mass: <span class="math">\( M_{\mathrm{tot}} = \frac{3 \, \sigma_v^2 \, r}{G} \)</span></li>
+            <li><b>Step 17:</b> Total cluster mass: <span class="math">\( M_{\mathrm{tot}} = \frac{3 \, \sigma_v^2 \, r}{G} \)</span></li>
 
         </ul>
 
@@ -6562,29 +6023,29 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
 
             <li><b>H<sub>0</sub></b> = 73 km/s/Mpc (Hubble constant)</li>
 
-            <li><b>G</b> = 4.302 &times; 10<sup>-6</sup> kpc&middot;(km/s)&sup2;&middot;M<sub>&odot;</sub><sup>-1</sup></li>
+            <li><b>G</b> = 4.30091 &times; 10<sup>-6</sup> kpc&middot;(km/s)&sup2;&middot;M<sub>&odot;</sub><sup>-1</sup></li>
 
-            <li><b>c</b> = 299792 km/s (Speed of light)</li>
+            <li><b>c</b> = 3 &times; 10<sup>5</sup> km/s (Speed of light)</li>
 
-            <li><b>U</b> = Gravitational potential energy of a particle [km&sup2;/s&sup2;]</li>
+            <li><b>U</b> = Gravitational potential energy  [km&sup2;/s&sup2;]</li>
 
             <li><b>F<sub>grav</sub></b> = Gravitational force [M<sub>&odot;</sub>&middot;kpc/s&sup2;]</li>
 
-            <li><b>F<sub>cent</sub></b> = Centripetal force [M<sub>&odot;</sub>&middot;kpc/s&sup2;]</li>
+            <li><b>F<sub>Newton</sub></b> = Newton's 2nd law force [M<sub>&odot;</sub>&middot;kpc/s&sup2;]</li>
 
             <li><b>v&sup2;(R)</b> = Squared orbital velocity for circular orbit [km&sup2;/s&sup2;]</li>
 
-            <li><b>K</b> = Kinetic energy of a particle [km&sup2;/s&sup2;]</li>
+            <li><b>K</b> = Kinetic energy [km&sup2;/s&sup2;]</li>
 
             <li><b>2K + U = 0</b> = Virial theorem for bound system</li>
 
-            <li><b>M<sub>circ</sub></b> = Mass corresponding to circular orbit of one particle [M<sub>&odot;</sub>]</li>
+            <li><b>M<sub>circ</sub></b> = Mass corresponding to circular orbit of a satellite [M<sub>&odot;</sub>]</li>
 
             <li><b>M<sub>tot</sub>(r)</b> = Total virial mass of the cluster [M<sub>&odot;</sub>]</li>
 
             <li><b>L<sub>B</sub></b> = Luminosity of a single galaxy in B-band [L<sub>&odot;</sub>]</li>
 
-            <li><b>L(r)</b> = Cumulative luminosity up to radius r [L<sub>&odot;</sub>]</li>
+  
 
             <li><b>M<sub>lum</sub>(r)</b> = Luminous mass within radius r [M<sub>&odot;</sub>]</li>
 
@@ -6594,13 +6055,12 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
 
             <li><b>M<sub>abs</sub></b> = Absolute magnitude of a galaxy [mag]</li>
 
-            <li><b>m</b> = Mass of a light single particle or galaxy [M<sub>&odot;</sub>]</li>
+            <li><b>m</b> = Mass of the satellite or galaxy [M<sub>&odot;</sub>]</li>
 
-            <li><b>M</b> = Mass inside radius r of heavy particle or total enclosed mass [M<sub>&odot;</sub>]</li>
+            <li><b>M</b> = Mass inside radius r of the planet or cluster [M<sub>&odot;</sub>]</li>
 
-            <li><b>M<sub>circ</sub></b> = Mass of a particle in circular orbit [M<sub>&odot;</sub>]</li>
+           
 
-            <li><b>v&sup2;</b> = Squared orbital velocity [km&sup2;/s&sup2;]</li>
 
             <li><b>L<sub>B,i</sub></b> = Luminosity of a single galaxy [L<sub>&odot;</sub>]</li>
 
@@ -6710,7 +6170,7 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                         ui.code(f'data = load_data("{cluster_select.value}")', language='python').classes('w-full')
 
                                         # 1) ORBITAL DYNAMICS
-                                        ui.label("1) Orbital dynamics (single light particle around heavy one)").classes('text-blue-200 font-bold text-lg')
+                                        ui.label("1) Circular motion (e.g. satellite around planet)").classes('text-blue-200 font-bold text-lg')
 
                                         # 2) POTENTIAL ENERGY
                                         ui.label("2) Compute the gravitational potential energy").classes('text-blue-200 font-bold text-lg')
@@ -6725,20 +6185,20 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                             ans_Fg['el'] = aria_select_input(vars_options, "Select variable for gravitational force")
 
                                         # 4) FORCE CENT
-                                        ui.label("4) Compute the centripetal force").classes('text-blue-200 font-bold text-lg')
+                                        ui.label("4) Compute the Newton's 2nd law force").classes('text-blue-200 font-bold text-lg')
                                         with ui.row().classes('items-center gap-1 math-text'):
-                                            ui.html('F<span class="math-sub">cent</span> = ')
-                                            ans_Fc['el'] = aria_select_input(vars_options, "Select variable for centripetal force")
+                                            ui.html('F<span class="math-sub">Newton</span> = ')
+                                            ans_Fc['el'] = aria_select_input(vars_options, "Select variable for Newton's 2nd law force")
 
                                         # 5) EQUATE
-                                        ui.label("5) Equate forces: F_grav = F_cent → derive v²(R)").classes('text-blue-200 font-bold text-lg')
+                                        ui.label("5) Equate: F_grav = m*centripetal acceleration → derive v²(R)").classes('text-blue-200 font-bold text-lg')
                                         with ui.row().classes('items-center gap-1 math-text'):
                                             ui.html('v<span class="math-sup">2</span>(R) = ')
                                             ans_v2['el'] = aria_select_input(vars_options, "Select variable for squared velocity")
 
                                     with ui.column().classes('flex-1 min-w-[400px] gap-2'):
                                         # 6) KINETIC
-                                        ui.label("6) Kinetic energy of the light particle").classes('text-blue-200 font-bold text-lg')
+                                        ui.label("6) Kinetic energy ").classes('text-blue-200 font-bold text-lg')
                                         with ui.row().classes('items-center gap-1 math-text'):
                                             ui.html('K = ')
                                             ans_K['el'] = aria_select_input(vars_options, "Select variable for kinetic energy")
@@ -6753,13 +6213,13 @@ Finally, we divide the total sum by the Degrees of Freedom (dof = N_bins - 2, be
                                             ui.html('&rang; = 0')
 
                                         # 8) CIRCULAR MASS
-                                        ui.label("8) Compute circular orbit mass of one particle").classes('text-blue-200 font-bold text-lg')
+                                        ui.label("8) Compute circular orbit mass").classes('text-blue-200 font-bold text-lg')
                                         with ui.row().classes('items-center gap-1 math-text'):
                                             ui.html('M<span class="math-sub">circ</span>(r) = ')
                                             ans_Mcirc['el'] = aria_select_input(vars_options, "Select formula for circular mass")
 
                                         # 9) TOTAL MASS SYSTEM
-                                        ui.label("9) Compute the total mass for a system of N particles:").classes('text-blue-200 font-bold text-lg')
+                                        ui.label("9) Compute the total mass for a system of N galaxies:").classes('text-blue-200 font-bold text-lg')
                                         with ui.row().classes('items-center gap-1 math-text'):
                                             ui.html('M<span class="math-sub">tot</span>(r) &asymp; &Sigma;')
                                             ans_Mvir['el'] = aria_select_input(vars_options, "Select formula for total mass system")
