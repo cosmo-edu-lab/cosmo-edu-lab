@@ -4438,8 +4438,8 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
 <ul>
     <li><b>Step 1 — Symmetric binning:</b> Peculiar velocities \( v_{\mathrm{pec},i} = v_i - \bar{v} \) are grouped into <b>39 equally spaced bins</b> (40 symmetric edges) centered at \( 0\,\mathrm{km/s} \), giving observed galaxy counts \( O_i \).</li>
     <li><b>Step 2 — 100&times; Monte Carlo oversampling:</b> To obtain smooth expected counts \( E_i \) without random fluctuations from a single \( N \)-galaxy draw (Barlow &amp; Beeston, 1993), we generate \( 100 N \) velocities from \( \mathcal{N}(0, \sigma_{\mathrm{sim}}) \) and weight each point by \( 1/100 \) so that \( \sum E_i = N \).</li>
-    <li><b>Step 3 — Reduced Chi-Square formula:</b> Evaluated only over the \( B \) valid bins with \( E_i \ge 0.5 \):<br>
-        <span class="math">\( \chi^2_{\nu} = \frac{1}{B - 3} \sum_{i:\, E_i \ge 0.5} \frac{(O_i - E_i)^2}{E_i} \)</span><br>
+    <li><b>Step 3 — Super-bin pooling &amp; Reduced Chi-Square:</b> To prevent small expected counts in the Gaussian tails from distorting \( \chi^2 \) while keeping all \( N \) galaxies, adjacent bins with \( E_i < 1 \) are iteratively combined into \( B \) super-bins satisfying \( E_i \ge 1 \) (Cochran, 1954; Hughes &amp; Hase, 2010):<br>
+        <span class="math">\( \chi^2_{\nu} = \frac{1}{B - 3} \sum_{i=1}^{B} \frac{(O_i - E_i)^2}{E_i} \)</span><br>
         Here \( k = 3 \) constraints are subtracted for the mean velocity (centered at 0), the global velocity dispersion \( \sigma_{\mathrm{sim}} \), and the total sample size \( N \) (Taylor, 1997, Sec. 12.3, p. 269).</li>
     <li><b>Why divide by \( E_i \)?</b> Bin counts follow Poisson statistics where the variance equals the expected count (\( \sigma_{\mathrm{counts}}^2 = E_i \)).</li>
 </ul>
@@ -5161,15 +5161,38 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         pesi_sim = np.ones_like(v_sim_tot) / oversample
                         counts_model, _ = np.histogram(v_sim_tot, bins=bins, weights=pesi_sim)
 
-                        # 3. Chi-quadrato ridotto su bin validi (E_i >= 0.5) con k = 3 vincoli (N, media, sigma)
-                        valid_bins = counts_model >= 0.5
-                        if np.sum(valid_bins) > 3:
-                            chi2_raw = np.sum(((counts_obs[valid_bins] - counts_model[valid_bins])**2) / counts_model[valid_bins])
-                            dof = max(1, np.sum(valid_bins) - 3)
-                            chi2_val = float(chi2_raw / dof)
+                        #  k = 3 vincoli (N, media, sigma)
+                        # 3. Chi-quadrato ridotto con accorpamento dei bin adiacenti in super-bin (E_i >= 1; Cochran 1954, Hughes & Hase 2010)
+                        E_merged = list(counts_model)
+                        O_merged = list(counts_obs)
+
+                        while len(E_merged) > 4 and min(E_merged) < 1.0:
+                            idx = int(np.argmin(E_merged))
+                            if idx == 0:
+                                val_e, val_o = E_merged.pop(0), O_merged.pop(0)
+                                E_merged[0] += val_e
+                                O_merged[0] += val_o
+                            elif idx == len(E_merged) - 1:
+                                val_e, val_o = E_merged.pop(-1), O_merged.pop(-1)
+                                E_merged[-1] += val_e
+                                O_merged[-1] += val_o
+                            else:
+                                if E_merged[idx - 1] <= E_merged[idx + 1]:
+                                    val_e, val_o = E_merged.pop(idx), O_merged.pop(idx)
+                                    E_merged[idx - 1] += val_e
+                                    O_merged[idx - 1] += val_o
+                                else:
+                                    val_e, val_o = E_merged.pop(idx), O_merged.pop(idx)
+                                    E_merged[idx] += val_e
+                                    O_merged[idx] += val_o
+
+                        E_arr = np.array(E_merged, dtype=float)
+                        O_arr = np.array(O_merged, dtype=float)
+                        if len(E_arr) > 3 and np.all(E_arr > 0):
+                            dof = len(E_arr) - 3
+                            chi2_val = float(np.sum(((O_arr - E_arr) ** 2) / E_arr) / dof)
                         else:
                             chi2_val = 0.0
-
                         # 4. Gestione punti e fit parabolico (logica dell'app invariata)
                         is_duplicate = any(abs(x - dm_ratio_display) < 1e-4 for x, y in cluster_state['chi2_points'])
                         if is_duplicate:
@@ -5581,8 +5604,8 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                             plt.axhline(0.0, color='gray', linestyle=':', linewidth=1, alpha=0.7)
                                             plt.xlim(0, r_max + r_padding)
                                             plt.ylim(-float(x_lim), float(x_lim))
-                                            plt.xlabel('Projected Radius [kpc]', fontsize=10)
-                                            plt.ylabel('Peculiar Velocity [km/s]', fontsize=10)
+                                            plt.xlabel('Radius [kpc]', fontsize=10)
+                                            plt.ylabel('Velocity [km/s]', fontsize=10)
                                             plt.title('Cluster galaxies velocities', fontsize=12, fontweight='bold')
                                             plt.legend(fontsize=10, loc='upper right')
                                             plt.grid(True, linestyle='--', alpha=0.7)
