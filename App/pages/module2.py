@@ -478,6 +478,8 @@ def create_page():
         return np.nan_to_num(sigma_los_approx, nan=0.0) # Sostituisce eventuali NaN residui con 0
 
 
+    
+
     @ui.page('/module2')
     def module2():
         #add custom CSS for the page
@@ -687,6 +689,21 @@ def create_page():
         color: #064e3b;
         line-height: 1.6;
     }
+    mjx-container:not([display="true"]) {
+    display: inline !important;
+    margin: 0 !important;
+}
+mjx-container:not([display="true"]) > svg {
+    display: inline !important;
+}
+mjx-container[display="true"] {
+    display: block !important;
+    text-align: center !important;
+    margin: 12px 0 !important;
+}
+mjx-container[display="true"] > svg {
+    display: inline-block !important;
+}
     
 
     </style>
@@ -1047,33 +1064,44 @@ def create_page():
                     ]
 
 
-                    with ui.dialog() as instr_kepler_phase1, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props('role=dialog aria-modal=true aria-label="Step-by-step exercises on Kepler Laws"'):
-                        
+                    with ui.dialog() as instr_kepler_phase1, ui.card().classes(
+    'p-6 w-[900px] max-w-[95vw] h-[560px] max-h-[85vh] flex flex-col justify-between overflow-hidden'
+).props('role=dialog aria-modal=true aria-label="Step-by-step exercises on Kepler Laws"'):
+
                         @ui.refreshable
                         def kepler_exercises_content():
                             current_step = kepler_exercise_state['step']
-                          
-                            html_info_box(kepler_exercises_html[current_step])
-                            
-                          
-                            with ui.row().classes('w-full justify-between items-center mt-4'):
-                               
-                                if current_step > 0:
-                                    aria_button("Previous", "Go to previous exercise", on_click=lambda: change_step(-1)) \
-                                        .classes("!bg-gray-500 hover:!bg-gray-700 text-white font-bold py-2 px-4 rounded")
-                                else:
-                                    ui.label() 
-                                
-                             
-                                ui.label(f"Step {current_step + 1} of {len(kepler_exercises_html)}").classes('text-gray-500 font-bold')
-                                
-                               
-                                if current_step < len(kepler_exercises_html) - 1:
-                                    aria_button("Next", "Go to next exercise", on_click=lambda: change_step(1)) \
-                                        .classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                                else:
-                                    aria_button("Close", "close the box", on_click=lambda: instr_kepler_phase1.close()) \
-                                        .classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                            last_step = len(kepler_exercises_html) - 1
+
+                            # Area contenuto centrale a dimensione fissa con scroll interno
+                            with ui.column().classes('w-full flex-1 overflow-y-auto pr-2'):
+                                html_info_box(kepler_exercises_html[current_step])
+
+                            # Barra di navigazione sempre ancorata in basso
+                            with ui.row().classes('w-full justify-between items-center pt-4 mt-2 border-t border-gray-200 shrink-0'):
+                                # Sinistra: Previous (disabilitato allo step 0 per non spostare il layout)
+                                prev_btn = aria_button(
+                                    "Previous", "Go to previous exercise",
+                                    on_click=lambda: change_step(-1)
+                                ).classes("!bg-gray-500 hover:!bg-gray-700 text-white font-bold py-2 px-4 rounded")
+                                if current_step == 0:
+                                    prev_btn.disable()
+
+                                # Centro: contatore step
+                                ui.label(f"Step {current_step + 1} of {len(kepler_exercises_html)}").classes('text-gray-600 font-bold')
+
+                                # Destra: Next + Close sempre presente
+                                with ui.row().classes('items-center gap-2'):
+                                    if current_step < last_step:
+                                        aria_button(
+                                            "Next", "Go to next exercise",
+                                            on_click=lambda: change_step(1)
+                                        ).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
+
+                                    aria_button(
+                                        "Close", "close the box",
+                                        on_click=instr_kepler_phase1.close
+                                    ).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
 
                         def change_step(delta):
                             kepler_exercise_state['step'] += delta
@@ -1322,8 +1350,8 @@ def create_page():
                                 
                             plt.scatter(a_sel / 1e6, v_sel, edgecolors='k', linewidths=0.8, facecolors='none', s=15, zorder=6)
                             plt.xlabel("Semi-major axis (10^6 km)",fontsize=10)
-                            plt.ylabel("Orbital velocity (km/s)",fontsize=10)
-                            plt.title("Keplerian Orbital Velocity Curve",fontsize=12, fontweight='bold')
+                            plt.ylabel("Velocity (km/s)",fontsize=10)
+                            plt.title("Keplerian Velocity Curve",fontsize=12, fontweight='bold')
                             plt.legend(fontsize=10)
                             plt.grid(True,alpha=0.1)
                             plt.xticks(fontsize=10)
@@ -1668,7 +1696,37 @@ def create_page():
                  
                     G_grav = 4.30091e-6   # kpc (km/s)^2 / M_sun
                 
-                  
+                    def compute_galaxy_mass_budget(f_val):
+                        r_ngc = gal_state['r_ngc']
+                        y_disk = gal_state.get('upsilon_disk', 0.5)
+                        y_bulge = gal_state.get('upsilon_bulge', 0.7)
+                        v_gas = gal_state['v_gas_ngc']
+                        v_disk = gal_state['v_disk_ngc']
+                        v_bul = gal_state['v_bul_ngc']
+                
+                        V_bar_sq = (
+                            v_gas * np.abs(v_gas)
+                            + y_disk * (v_disk * np.abs(v_disk))
+                            + y_bulge * (v_bul * np.abs(v_bul))
+                        )
+                        v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0.0))
+                        m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
+                
+                        M_dm_grid_base = gal_state.get('base_M_dm_grid', np.zeros_like(r_ngc))
+                        M_dm_grid = M_dm_grid_base * float(f_val)
+                
+                        if len(r_ngc) > 0:
+                            idx_out = int(np.nanargmax(r_ngc))
+                            val_m_bar = float(m_baryonic[idx_out])
+                            val_m_dm = float(M_dm_grid[idx_out])
+                        else:
+                            val_m_bar = 0.0
+                            val_m_dm = 0.0
+                
+                        val_m_tot = val_m_bar + val_m_dm
+                        dm_ratio = (val_m_dm / val_m_tot) if val_m_tot > 0 else 0.0
+                
+                        return v_baryonic, m_baryonic, M_dm_grid, val_m_bar, val_m_dm, val_m_tot, dm_ratio
                     default_galaxy = "NGC3198.txt"
                     
                     galaxy_state = {
@@ -1895,51 +1953,38 @@ def create_page():
                       
                         dialog_status_label = ui.label("").classes("text-xl font-bold text-center w-full my-1")
                         
-                        with ui.row().classes('w-full items-center justify-center gap-4 mt-1 mb-4 shrink-0 bg-slate-50 p-4 rounded-xl shadow-inner border border-slate-200'):
+                        with ui.row().classes('w-full items-center justify-center gap-4 mt-1 mb-4 shrink-0 bg-slate-50 pt-8 pb-4 px-4 rounded-xl shadow-inner border border-slate-200'):
                             ui.label("Add Dark Matter:").classes("font-bold text-lg text-slate-800")
-                          
-                            dialog_dm_slider = ui.slider(min=0.0, max=2.0, value=0.0, step=0.01).classes('w-1/2').props('color=purple label-always')
+                            dialog_dm_slider = ui.slider(min=0.0, max=2.0, value=0.0, step=0.01) \
+                                .classes('w-1/2') \
+                                .props('color=purple label-always label-value="0.0%"')
+                            dialog_gal_dm_badge = ui.html(
+                                'DM / M<sub>tot</sub>: <b>0.0%</b>'
+                            ).classes('px-3 py-1 rounded-full bg-purple-100 text-purple-900 text-sm font-medium border border-purple-300')
 
                        
                         def evaluate_dm_status_dialog(e=None):
-                            if not gal_state.get('DATA_LOADED'): return
-                            r_ngc = gal_state['r_ngc']
-                            y_disk = gal_state.get('upsilon_disk', 0.5)
-                            y_bulge = gal_state.get('upsilon_bulge', 0.7)
-                            v_gas_ngc = gal_state['v_gas_ngc']
-                            v_disk_ngc = gal_state['v_disk_ngc']
-                            v_bul_ngc = gal_state['v_bul_ngc']
-                            
-                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_disk * (v_disk_ngc * np.abs(v_disk_ngc)) + y_bulge * (v_bul_ngc * np.abs(v_bul_ngc))
-                            m_baryonic = (np.maximum(V_bar_sq, 0) * r_ngc) / G_grav
-                            val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
-                            
-                            rho_s = gal_state.get('base_rho_s', 0.0)
-                            r_s = gal_state.get('base_r_s', 1.0)
-                            M_dm_grid_best = M_burkert_enclosed(r_ngc, rho_s, r_s)
-                            val_m_dm_best = np.nanmax(M_dm_grid_best) if len(M_dm_grid_best) > 0 else 0
-                            
-                            target_fraction = val_m_dm_best / (val_m_bar + val_m_dm_best) if (val_m_bar + val_m_dm_best) > 0 else 0
-                            
-                            f_slider = float(dialog_dm_slider.value)
-                            val_m_dm_current = val_m_dm_best * f_slider
-                            current_fraction = val_m_dm_current / (val_m_bar + val_m_dm_current) if (val_m_bar + val_m_dm_current) > 0 else 0
-                            
+                            if not gal_state.get('DATA_LOADED') or len(gal_state.get('r_ngc', [])) == 0:
+                                return
+
+                            _, _, _, _, _, _, target_fraction = compute_galaxy_mass_budget(1.0)
+                            _, _, _, _, _, _, current_fraction = compute_galaxy_mass_budget(float(dialog_dm_slider.value))
+
                             gal_name = gal_state.get('current_galaxy_name', 'Galaxy').removesuffix('.txt').removesuffix('.csv').removesuffix('.dat')
-                            
+
                             if current_fraction < 0.05:
                                 msg = "Dark matter missing! Move the slider to add mass."
                                 color_class = "text-red-600"
                             elif current_fraction < target_fraction - 0.04:
-                                msg = f"More Dark Matter needed!"
+                                msg = "More Dark Matter needed!"
                                 color_class = "text-orange-500"
                             elif current_fraction > target_fraction + 0.04:
-                                msg = f"Too much Dark Matter!"
+                                msg = "Too much Dark Matter!"
                                 color_class = "text-orange-500"
                             else:
                                 msg = f"Perfect! The Dark Matter halo matches {gal_name}'s real rotation curve."
                                 color_class = "text-green-600"
-                                
+
                             dialog_status_label.set_text(msg)
                             dialog_status_label.classes(replace=f"text-xl font-bold text-center w-full my-1 {color_class}")
 
@@ -1959,48 +2004,50 @@ def create_page():
                                 r_max_plot = 10.0 
 
                                 if gal_state.get('DATA_LOADED') and len(gal_state.get('r_ngc', [])) > 0:
+                                   
+                                    
                                     r_ngc = gal_state['r_ngc']
                                     current_gal = gal_state.get('current_galaxy_name', '').removesuffix('.txt')
                                     r_max_plot = np.nanmax(r_ngc) * 1.05
-                                    
+
                                     y_disk = gal_state.get('upsilon_disk', 0.5)
                                     y_bulge = gal_state.get('upsilon_bulge', 0.7)
-                                    
-                                    m_bulge = (r_ngc * y_bulge * (gal_state['v_bul_ngc']**2)) / G_grav
-                                    M_bulge_tot = np.nanmax(m_bulge) if np.nanmax(m_bulge) > 0 else 0
-                                    
-                                    m_disk = (r_ngc * y_disk * (gal_state['v_disk_ngc']**2)) / G_grav
-                                    M_disk_tot = np.nanmax(m_disk) if np.nanmax(m_disk) > 0 else 0
-                                    
-                                    v_gas_sq = gal_state['v_gas_ngc'] * np.abs(gal_state['v_gas_ngc'])
-                                    m_gas = (r_ngc * np.maximum(v_gas_sq, 0)) / G_grav
-                                    M_gas_tot = np.nanmax(m_gas) if np.nanmax(m_gas) > 0 else 0
-                                    
                                     f_slider = float(dialog_dm_slider.value)
-                                    rho_s, r_s, M_dm_grid = get_dm_params(f_slider, r_array=r_ngc)
-                                    M_dm_tot = np.nanmax(M_dm_grid) if (len(M_dm_grid) > 0 and np.nanmax(M_dm_grid) > 0) else 0
-                                    
-                                    m_baryonic_tot = m_bulge + m_disk + m_gas
-                                    v_total_curve = np.sqrt(G_grav * (m_baryonic_tot + M_dm_grid) / r_ngc)
-                                    
-                                    M_bar_tot = M_bulge_tot + M_disk_tot + M_gas_tot
-                                    M_tot_all = M_bar_tot + M_dm_tot
 
-                               
-                                    dm_ratio_gal = (M_dm_tot / M_tot_all) if M_tot_all > 0 else 0.0
-                                    dialog_dm_slider.props(f'label-value="DM: {dm_ratio_gal * 100:.1f}%"')
+                                    # Stesso bilancio di massa del pannello principale
+                                    _, m_baryonic_tot, M_dm_grid, val_m_bar, M_dm_tot, M_tot_all, dm_ratio_gal = compute_galaxy_mass_budget(f_slider)
+                                    v_total_curve = np.sqrt(G_grav * (m_baryonic_tot + M_dm_grid) / r_ngc)
+
+                                    # Profili delle singole componenti barioniche (solo per la geometria 3D)
+                                    idx_out = int(np.nanargmax(r_ngc))
+                                    m_bulge = np.maximum((r_ngc * y_bulge * (gal_state['v_bul_ngc'] * np.abs(gal_state['v_bul_ngc']))) / G_grav, 0.0)
+                                    m_disk  = np.maximum((r_ngc * y_disk * (gal_state['v_disk_ngc'] * np.abs(gal_state['v_disk_ngc']))) / G_grav, 0.0)
+                                    m_gas   = np.maximum((r_ngc * (gal_state['v_gas_ngc'] * np.abs(gal_state['v_gas_ngc']))) / G_grav, 0.0)
+
+                                    M_bulge_tot = float(m_bulge[idx_out])
+                                    M_disk_tot  = float(m_disk[idx_out])
+                                    M_gas_tot   = float(m_gas[idx_out])
+                                    M_bar_comp_sum = M_bulge_tot + M_disk_tot + M_gas_tot
+
+                                    # Slider e badge con pedice vero allineati al pannello principale
+                                    dialog_dm_slider.props(f'label-value="{dm_ratio_gal * 100:.1f}%"')
+                                    dialog_gal_dm_badge.set_content(f'DM / M<sub>tot</sub>: <b>{dm_ratio_gal * 100:.1f}%</b>')
 
                                     title_label.set_text(f"3D Mass Distribution: {current_gal}")
 
                                     v_min_gal = np.nanmin(v_total_curve)
                                     v_max_gal = np.nanmax(v_total_curve)
-                                    c_max_bright = v_max_gal * 1.15 
+                                    c_max_bright = v_max_gal * 1.15
 
                                     N_TOTAL_POINTS = 3500
-                                    n_bulge = int(N_TOTAL_POINTS * (M_bulge_tot / M_tot_all)) if M_tot_all > 0 else 0
-                                    n_disk  = int(N_TOTAL_POINTS * (M_disk_tot / M_tot_all)) if M_tot_all > 0 else 0
-                                    n_gas   = int(N_TOTAL_POINTS * (M_gas_tot / M_tot_all)) if M_tot_all > 0 else 0
-                                    n_dm    = int(N_TOTAL_POINTS * (M_dm_tot / M_tot_all)) if M_tot_all > 0 else 0
+                                    n_dm = int(N_TOTAL_POINTS * dm_ratio_gal)
+                                    n_bar_pts = N_TOTAL_POINTS - n_dm
+                                    if M_bar_comp_sum > 0:
+                                        n_bulge = int(n_bar_pts * (M_bulge_tot / M_bar_comp_sum))
+                                        n_disk  = int(n_bar_pts * (M_disk_tot / M_bar_comp_sum))
+                                        n_gas   = max(0, n_bar_pts - n_bulge - n_disk)
+                                    else:
+                                        n_bulge = n_disk = n_gas = 0
 
                                     def sample_component(m_array, n_pts, is_spherical=False, z_thickness=0.1):
                                         if n_pts <= 0 or np.nanmax(m_array) <= 0: 
@@ -2228,7 +2275,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
         <ul class="list-disc pl-5 space-y-1">
             <li><b>1a)</b> Choose 3 values of dark matter fraction (f) with the slider above to compute the &chi;&sup2; at that point.</li>
             <li><b>1b)</b> Press <b>'Add &chi;&sup2; point'</b> button to add the point to the &chi;&sup2; plot.</li>
-            <li><b>2a)</b> Input 3 values for the dark matter fraction (M_DM / M_tot, between 0 and 1).</li>
+            <l<li><b>2a)</b> Input 3 values for the dark matter fraction (M<sub>DM</sub> / M<sub>tot</sub>, between 0 and 1).</li>
             <li><b>2b)</b> Press <b>'compute &chi;&sup2; and minimum'</b> button to calculate the &chi;&sup2; at those points and check the minimum on the plot.</li>
         </ul>
 
@@ -2393,44 +2440,56 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                     ]
                                 
 
-                    with ui.dialog() as instr_combined_galaxy, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props('aria-label="Galaxy exercises" role=dialog'):
-                        
+                    with ui.dialog() as instr_combined_galaxy, ui.card().classes(
+    'p-6 w-[900px] max-w-[95vw] h-[560px] max-h-[85vh] flex flex-col justify-between overflow-hidden'
+).props('aria-label="Galaxy exercises" role=dialog aria-modal=true'):
+
                         @ui.refreshable
                         def combined_exercises_content():
                             current_step = combined_exercise_state['step']
-                            
-                            html_info_box(combined_exercises_html[current_step])
-                            
-                            with ui.row().classes('w-full justify-between items-center mt-4'):
-                                
-                                if current_step > 0:
-                                 
-                                    aria_button("Previous", "Go to previous exercise", on_click=lambda: change_step_galaxy_combined(-1)) \
-                                        .classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                                else:
-                                    ui.label()
-                                
-                                ui.label(f"Step {current_step + 1} of {len(combined_exercises_html)}").classes('text-gray-500 font-bold')
-                                
-                                if current_step < len(combined_exercises_html) - 1:
-                                   
-                                    aria_button("Next", "Go to next exercise", on_click=lambda: change_step_galaxy_combined(1)) \
-                                        .classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                                else:
-                                    aria_button("Close", "close the box", on_click=lambda: instr_combined_galaxy.close()) \
-                                        .classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                            last_step = len(combined_exercises_html) - 1
 
-                       
+                            # Contenuto centrale scrollabile a dimensione fissa
+                            with ui.column().classes('w-full flex-1 overflow-y-auto pr-2'):
+                                html_info_box(combined_exercises_html[current_step])
+
+                            # Barra inferiore fissa: Previous | Step X of Y | Next + Close
+                            with ui.row().classes('w-full justify-between items-center pt-4 mt-2 border-t border-gray-200 shrink-0'):
+                                prev_btn = aria_button(
+                                    "Previous", "Go to previous exercise",
+                                    on_click=lambda: change_step_galaxy_combined(-1)
+                                ).classes("!bg-gray-500 hover:!bg-gray-700 text-white font-bold py-2 px-4 rounded")
+                                if current_step == 0:
+                                    prev_btn.disable()
+
+                                ui.label(f"Step {current_step + 1} of {len(combined_exercises_html)}").classes('text-gray-600 font-bold')
+
+                                with ui.row().classes('items-center gap-2'):
+                                    next_btn = aria_button(
+                                        "Next", "Go to next exercise",
+                                        on_click=lambda: change_step_galaxy_combined(1)
+                                    ).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
+                                    if current_step == last_step:
+                                        next_btn.disable()
+
+                                    aria_button(
+                                        "Close", "close the box",
+                                        on_click=instr_combined_galaxy.close
+                                    ).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+
                         def change_step_galaxy_combined(delta):
                             new_step = combined_exercise_state['step'] + delta
                             if 0 <= new_step < len(combined_exercises_html):
                                 combined_exercise_state['step'] = new_step
                                 combined_exercises_content.refresh()
+                                ui.run_javascript("setTimeout(() => { if (typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 50);")
 
-                        instr_combined_galaxy.on('open', lambda: combined_exercise_state.update({'step': 0}) or combined_exercises_content.refresh())
+                        instr_combined_galaxy.on(
+                            'open',
+                            lambda: combined_exercise_state.update({'step': 0}) or combined_exercises_content.refresh()
+                        )
 
                         combined_exercises_content()
-
                    
                     
                     with ui.row().classes('w-full items-center justify-center gap-4'):
@@ -2466,9 +2525,18 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         
 
 
-                    ui.label("Move the slider to add the dark matter to the simulated velocity curve").props('id=alpha_slider_label aria-live=polite tabindex=0')
-                    alpha_slider = aria_slider(min=0.0, max=2.0, value=0.0, step=0.01,
-                                            aria_label="Dark matter fraction control slider").props('aria-describedby=alpha_slider_label label-always')
+                    # Pannello galassie
+                    with ui.row().classes('w-full items-center justify-center gap-3 mb-8'):
+                        ui.label("Move the slider to add the dark matter to the simulated velocity curve") \
+                            .props('id=alpha_slider_label aria-live=polite tabindex=0')
+                        gal_dm_badge = ui.html(
+                            'DM / M<sub>tot</sub>: <b>0.0%</b>'
+                        ).classes('px-3 py-1 rounded-full bg-blue-100 text-blue-900 text-sm font-medium border border-blue-300')
+
+                    alpha_slider = aria_slider(
+                        min=0.0, max=2.0, value=0.0, step=0.01,
+                        aria_label="Dark matter fraction control slider"
+                    ).props('aria-describedby=alpha_slider_label label-always label-value="0.0%"')
                     alpha_slider.bind_value(dialog_dm_slider, 'value')
                     f = float(alpha_slider.value)
                     
@@ -2592,6 +2660,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                     galaxy_select.on_value_change(lambda e: reload_galaxy(e.value))
                     #alpha_slider.on('update:model-value', update_all_plots.refresh)
                     alpha_slider.on('change', lambda e: update_all_plots.refresh())
+                    galaxy_3d_dialog.on('hide', lambda: update_all_plots.refresh())
                     if default_galaxy:
                         reload_galaxy(default_galaxy)
 
@@ -2811,45 +2880,14 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                
                                 async def open_galaxy_3d():
                                     evaluate_dm_status_dialog()
-                                    target_fraction = 0.5 # Default di fallback nel caso i dati non siano pronti
+                                    target_fraction = 0.5
+                                    current_fraction = 0.0
                                     gal_name = gal_state.get('current_galaxy_name', 'Galaxy').removesuffix('.txt').removesuffix('.csv').removesuffix('.dat')
 
-                                    # Calcola la frazione reale di Dark Matter per QUESTA specifica galassia
                                     if gal_state.get('DATA_LOADED') and len(gal_state.get('r_ngc', [])) > 0:
-                                        r_ngc = gal_state['r_ngc']
-                                        y_disk = gal_state.get('upsilon_disk', 0.5)
-                                        y_bulge = gal_state.get('upsilon_bulge', 0.7)
-                                        
-                                        v_gas_ngc = gal_state['v_gas_ngc']
-                                        v_disk_ngc = gal_state['v_disk_ngc']
-                                        v_bul_ngc = gal_state['v_bul_ngc']
-                                        
-                                        # Massa Barionica Totale
-                                        V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_disk * (v_disk_ngc * np.abs(v_disk_ngc)) + y_bulge * (v_bul_ngc * np.abs(v_bul_ngc))
-                                        m_baryonic = (np.maximum(V_bar_sq, 0) * r_ngc) / G_grav
-                                        val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
-                                        
-                                        # Massa Oscura Ideale (best-fit dal dataset)
-                                        rho_s = gal_state.get('base_rho_s', 0.0)
-                                        r_s = gal_state.get('base_r_s', 1.0)
-                                        M_dm_grid_best = M_burkert_enclosed(r_ngc, rho_s, r_s)
-                                        val_m_dm_best = np.nanmax(M_dm_grid_best) if len(M_dm_grid_best) > 0 else 0
-                                        
-                                        # Frazione reale target (es. 0.75 -> 75% di DM sul totale)
-                                        total_mass = val_m_bar + val_m_dm_best
-                                        if total_mass > 0:
-                                            target_fraction = val_m_dm_best / total_mass
+                                        _, _, _, _, _, _, target_fraction = compute_galaxy_mass_budget(1.0)
+                                        _, _, _, _, _, _, current_fraction = compute_galaxy_mass_budget(float(alpha_slider.value))
 
-                                    # Valore attuale impostato dallo slider dell'utente (espresso come percentuale DM/Tot)
-                                    # Ricaviamo la frazione attuale visualizzata sull'etichetta dello slider o calcolata
-                                    f_slider = float(alpha_slider.value)
-                                    
-                                    # Se lo slider controlla il fattore f, calcoliamo la frazione di DM corrispondente
-                                    current_dm_mass = val_m_dm_best * f_slider
-                                    current_total_mass = val_m_bar + current_dm_mass
-                                    current_fraction = current_dm_mass / current_total_mass if current_total_mass > 0 else 0
-                                    
-                                
                                     if current_fraction < 0.05:
                                         accessible_notify("Dark matter missing! Move the slider to add mass.", type_='warning')
                                     elif current_fraction < target_fraction - 0.04:
@@ -2858,7 +2896,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                         accessible_notify(f"Too much Dark Matter! For {gal_name}, the ideal DM fraction is ~{target_fraction*100:.1f}%.", type_='warning')
                                     else:
                                         accessible_notify(f"Perfect! The Dark Matter halo matches the real value for {gal_name} (~{target_fraction*100:.1f}%).", type_='success')
-                                        
+
                                     render_3d_mass_plot.refresh()
                                     await asyncio.sleep(0.1)
                                     galaxy_3d_dialog.open()
@@ -2996,23 +3034,9 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             f = float(alpha_slider.value)
                             G_grav = 4.30091e-6
                             
-                            y_disk = gal_state.get('upsilon_disk', 0.5)
-                            y_bulge = gal_state.get('upsilon_bulge', 0.7)
-                            
-                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_disk * (v_disk_ngc * np.abs(v_disk_ngc)) + y_bulge * (v_bul_ngc * np.abs(v_bul_ngc))
-                            v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
-                            m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
-                            
-                            rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
+                            f = float(alpha_slider.value)
+                            v_baryonic, m_baryonic, M_dm_grid_f, val_m_bar, M_dm_tot, val_m_tot, dm_ratio_gal = compute_galaxy_mass_budget(f)
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
-                            
-                          
-                            M_dm_tot = np.nanmax(M_dm_grid_f) if len(M_dm_grid_f) > 0 else 0
-                            m_total_model = m_baryonic + M_dm_grid_f 
-                            val_m_tot = np.nanmax(m_total_model) if len(m_total_model) > 0 else 0
-                            val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
-                            
-                            dm_ratio_gal = (M_dm_tot / val_m_tot) if val_m_tot > 0 else 0.0
                             # -----------------------------------------------------
                             
                             clean_name = current_galaxy_name.removesuffix('.txt').removesuffix('.csv').removesuffix('.dat')
@@ -3057,16 +3081,17 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             ui.run_javascript(f"window.vObsSeries = {v_obs_list}; window.vBarySeries = {v_bary_list}; window.vSimSeries = {v_total_list}; window.vObsMean = {v_obs_mean}; window.vBarMean = {v_bary_mean}; window.vSimMean = {v_total_mean}; window.vDiffSeries = {v_diff_list}; window.vDiffMean = {v_diff_mean};")
 
                        
-                            alpha_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio_gal * 100:.1f}%"')
+                            alpha_slider.props(f'label-value="{dm_ratio_gal * 100:.1f}%"')
+                            gal_dm_badge.set_content(f'DM / M<sub>tot</sub>: <b>{dm_ratio_gal * 100:.1f}%</b>')
 
                             with plot_container:
                                 plot_container.clear()
                                 plt.close() 
                                 with ui.pyplot(figsize=(6, 4), close=False, clear=True):
                                     ax = plt.gca()
-                                    plt.plot(r_ngc, v_baryonic, color='red', linewidth=3, label=f'Keplerian velocity ')
-                                    plt.plot(r_ngc, v_total_curve, linewidth=3, color='green', label="Simulated velocity" )
-                                    plt.errorbar(r_ngc, v_obs_ngc, yerr=v_err_ngc, fmt='o', markersize=4, color='blue', ecolor='gray', capsize=2, label='Observed velocity', zorder=5)
+                                    plt.plot(r_ngc, v_baryonic, color='red', linewidth=3.5, alpha=0.8, zorder=2,label=f'Keplerian velocity ')
+                                    plt.plot(r_ngc, v_total_curve, color='green',linewidth=2.0,alpha=0.95, zorder=3,  label="Simulated velocity" )
+                                    plt.errorbar(r_ngc, v_obs_ngc, yerr=v_err_ngc, fmt='o', markersize=3.5, color='blue', ecolor='gray', capsize=2, label='Observed velocity', zorder=5)
                                     
                                     ax.yaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
                                     ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
@@ -3134,9 +3159,9 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                     ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
                                     ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
                                     ax.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-                                    plt.plot(r_ngc, m_baryonic, "r-", lw=3, label=f"Baryonic mass")
-                                    plt.plot(r_ngc, m_total_obs, "b-", lw=3, label=f"Total mass")
-                                    plt.plot(r_ngc, m_total_model, "g-", lw=3, label=f"Simulated mass")
+                                    plt.plot(r_ngc, m_baryonic, "r-", lw=3.5, alpha=0.8, zorder=2,label=f"Baryonic mass")
+                                    plt.plot(r_ngc, m_total_obs, "b-", lw=3.5, alpha=0.9, zorder=3, label=f"Total mass")
+                                    plt.plot(r_ngc, m_total_model, "g-", lw=2.0, alpha=0.95, zorder=4, label=f"Simulated mass")
                                     
                                     
                                    
@@ -3270,25 +3295,12 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             if not galaxy_name or len(r_ngc) == 0:
                                 return np.inf
                             
-                            y_disk = gal_state.get('upsilon_disk', 0.5)
-                            y_bulge = gal_state.get('upsilon_bulge', 0.7)
-                            
-                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_disk * (v_disk_ngc * np.abs(v_disk_ngc)) + y_bulge * (v_bul_ngc * np.abs(v_bul_ngc))
-                            
-                           
-                            rho_s, r_s, unscaled_M_dm_grid = get_dm_params(1.0, r_array=r_ngc)
-                            max_dm_unscaled = np.nanmax(unscaled_M_dm_grid) if len(unscaled_M_dm_grid) > 0 else 0
-                           
-                            v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
-                            m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
-                            val_m_bar = np.nanmax(m_baryonic) if len(m_baryonic) > 0 else 0
-                            
-                            if max_dm_unscaled <= 1e-6 or target_fraction >= 1.0 or target_fraction < 0: 
+                            v_baryonic, m_baryonic, unscaled_M_dm_grid, val_m_bar, dm_unscaled_out, _, _ = compute_galaxy_mass_budget(1.0)
+
+                            if dm_unscaled_out <= 1e-6 or target_fraction >= 1.0 or target_fraction < 0:
                                 return np.inf
 
-                          
-                            f_val = (target_fraction * val_m_bar) / (max_dm_unscaled * (1.0 - target_fraction))
-                            
+                            f_val = (target_fraction * val_m_bar) / (dm_unscaled_out * (1.0 - target_fraction))
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + f_val * unscaled_M_dm_grid) / r_ngc)
 
                             mask = np.isfinite(v_obs_ngc) & np.isfinite(v_err_ngc) & (v_err_ngc > 0)
@@ -3311,20 +3323,8 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             chi2_points = gal_state['chi2_points']
                           
                             f = float(alpha_slider.value)
-                            y_disk = gal_state.get('upsilon_disk', 0.5)
-                            y_bulge = gal_state.get('upsilon_bulge', 0.7)
-                            
-                            V_bar_sq = v_gas_ngc * np.abs(v_gas_ngc) + y_disk * (v_disk_ngc * np.abs(v_disk_ngc)) + y_bulge * (v_bul_ngc * np.abs(v_bul_ngc))
-                            v_baryonic = np.sqrt(np.maximum(V_bar_sq, 0))
-                            m_baryonic = (v_baryonic**2 * r_ngc) / G_grav
-                            
-                            rho_s, r_s, M_dm_grid_f = get_dm_params(f, r_array=r_ngc) 
+                            v_baryonic, m_baryonic, M_dm_grid_f, val_m_bar, M_dm_tot, val_m_tot, dm_fraction = compute_galaxy_mass_budget(f)
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
-                            
-                         
-                            M_dm_tot = np.nanmax(M_dm_grid_f) if len(M_dm_grid_f) > 0 else 0
-                            val_m_tot = np.nanmax(m_baryonic + M_dm_grid_f) if len(m_baryonic + M_dm_grid_f) > 0 else 0
-                            dm_fraction = (M_dm_tot / val_m_tot) if val_m_tot > 0 else 0.0
 
                             mask = np.isfinite(v_obs_ngc) & np.isfinite(v_err_ngc) & (v_err_ngc > 0)
                             vobs_use = v_obs_ngc[mask]
@@ -3576,11 +3576,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
             display: block !important;
         }
         
-        /* Forziamo MathJax a non andare a capo */
-        mjx-container { 
-            display: inline-block !important;
-            white-space: nowrap !important;
-        }
+    
     </style>
 
         <div class="formula-box">
@@ -4283,39 +4279,56 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                     ]
 
               
-                    with ui.dialog() as instr_cluster_combined, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props('aria-label="Cluster activity" role=dialog'):
-                        
+                  
+                    with ui.dialog() as instr_cluster_combined, ui.card().classes(
+'p-6 w-[900px] max-w-[95vw] h-[560px] max-h-[85vh] flex flex-col justify-between overflow-hidden'
+).props('aria-label="Cluster activity" role=dialog aria-modal=true'):
+
                         @ui.refreshable
                         def cluster_combined_content():
                             current_step = combined_cluster_state['step']
-                            
-                            html_info_box(combined_cluster_html[current_step])
-                            
-                            with ui.row().classes('w-full justify-between items-center mt-4'):
-                             
-                                if current_step > 0:
-                                    aria_button("Previous", "Go to previous step", on_click=lambda: change_step_combined(-1)) \
-                                        .classes("!bg-gray-500 hover:!bg-gray-700 text-white font-bold py-2 px-4 rounded")
-                                else:
-                                    ui.label() 
-                                
-                                ui.label(f"Step {current_step + 1} of {len(combined_cluster_html)}").classes('text-gray-500 font-bold')
-                                
-                               
-                                if current_step < len(combined_cluster_html) - 1:
-                                    aria_button("Next", "Go to next step", on_click=lambda: change_step_combined(1)) \
-                                        .classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
-                                else:
-                                    aria_button("Close", "Close the activity", on_click=lambda: instr_cluster_combined.close()) \
-                                        .classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
+                            last_step = len(combined_cluster_html) - 1
+
+                            # Contenuto centrale scrollabile a dimensione fissa
+                            with ui.column().classes('w-full flex-1 overflow-y-auto pr-2'):
+                                html_info_box(combined_cluster_html[current_step])
+
+                            # Barra inferiore fissa: Previous | Step X of Y | Next + Close
+                            with ui.row().classes('w-full justify-between items-center pt-4 mt-2 border-t border-gray-200 shrink-0'):
+                                prev_btn = aria_button(
+                                    "Previous", "Go to previous step",
+                                    on_click=lambda: change_step_combined(-1)
+                                ).classes("!bg-gray-500 hover:!bg-gray-700 text-white font-bold py-2 px-4 rounded")
+                                if current_step == 0:
+                                    prev_btn.disable()
+
+                                ui.label(f"Step {current_step + 1} of {len(combined_cluster_html)}").classes('text-gray-600 font-bold')
+
+                                with ui.row().classes('items-center gap-2'):
+                                    next_btn = aria_button(
+                                        "Next", "Go to next step",
+                                        on_click=lambda: change_step_combined(1)
+                                    ).classes("!bg-blue-600 hover:!bg-blue-800 text-white font-bold py-2 px-4 rounded")
+                                    if current_step == last_step:
+                                        next_btn.disable()
+
+                                    aria_button(
+                                        "Close", "Close the activity",
+                                        on_click=instr_cluster_combined.close
+                                    ).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
 
                         def change_step_combined(delta):
                             new_step = combined_cluster_state['step'] + delta
                             if 0 <= new_step < len(combined_cluster_html):
                                 combined_cluster_state['step'] = new_step
                                 cluster_combined_content.refresh()
+                                ui.run_javascript("setTimeout(() => { if (typeof MathJax !== 'undefined') MathJax.typesetPromise(); }, 50);")
 
-                        instr_cluster_combined.on('open', lambda: combined_cluster_state.update({'step': 0}) or cluster_combined_content.refresh())
+                        instr_cluster_combined.on(
+                            'open',
+                            lambda: combined_cluster_state.update({'step': 0}) or cluster_combined_content.refresh()
+                        )
+
                         cluster_combined_content()
                     with ui.dialog() as dataset_dialog, ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto ').props('aria-label="Dataset info" role=dialog'):
                 
@@ -4565,13 +4578,18 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             ui.label("Cluster structure and mass distribution").classes("text-2xl font-bold text-slate-800")
                             with ui.row().classes('gap-4'):
                                 aria_button("Info", 'instructions', on_click=lambda: [cluster_3d_info_dialog.open(), ui.run_javascript("MathJax.typesetPromise()")]).classes("!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-6 rounded shadow-md")
-                                aria_button("Close", 'close', on_click=lambda: [cluster_3d_dialog.close(), refresh_cluster_plots(full_anim=False)]).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md")
+                                aria_button("Close", 'close', on_click=cluster_3d_dialog.close).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md")
 
                         dialog_status_label_cluster = ui.label("").classes("text-xl font-bold text-center w-full my-1")
                         
-                        with ui.row().classes('w-full items-center justify-center gap-4 mt-1 mb-4 shrink-0 bg-slate-50 p-4 rounded-xl shadow-inner border border-slate-200'):
+                        with ui.row().classes('w-full items-center justify-center gap-4 mt-1 mb-4 shrink-0 bg-slate-50 pt-8 pb-4 px-4 rounded-xl shadow-inner border border-slate-200'):
                             ui.label("Add Dark Matter:").classes("font-bold text-lg text-slate-800")
-                            dialog_cluster_dm_slider = ui.slider(min=0.0, max=2.0, value=0.0, step=0.01).classes('w-1/2').props('color=purple label-always')
+                            dialog_cluster_dm_slider = ui.slider(min=0.0, max=2.0, value=0.0, step=0.01) \
+                                .classes('w-1/2') \
+                                .props('color=purple label-always label-value="0.0%"')
+                            dialog_cluster_dm_badge = ui.html(
+                                'DM / M<sub>tot</sub>: <b>0.0%</b>'
+                            ).classes('px-3 py-1 rounded-full bg-purple-100 text-purple-900 text-sm font-medium border border-purple-300')
 
                         def evaluate_cluster_dm_status_dialog(e=None):
                             try:
@@ -4634,7 +4652,8 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                     progress = (current_M_DM / M_dm_true) if M_dm_true > 0 else 0.0
                                     c_nfw = cluster_state.get('c', 4.0)
 
-                                    dialog_cluster_dm_slider.props(f'label-value="DM: {dm_ratio_display * 100:.1f}%"')
+                                    dialog_cluster_dm_slider.props(f'label-value="{dm_ratio_display * 100:.1f}%"')
+                                    dialog_cluster_dm_badge.set_content(f'DM / M<sub>tot</sub>: <b>{dm_ratio_display * 100:.1f}%</b>')
                                     title_label.set_text(f"3D Mass Distribution: {current_cluster}")
 
                                     n_gas = 1500 if m_gas_global_fixed > 0 else 0
@@ -5237,11 +5256,21 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                   
 
                     with ui.column().classes('w-full items-center '):
-                        dm_slider_min, dm_slider_max = 0.0, 2.0
-                        ui.label("Move the slider to add dark matter to the simulated velocity distribution in the cluster").props('id=dm_slider_label')
-                        dm_slider = aria_slider(min=dm_slider_min, max=dm_slider_max,
-                        value=0.0, step=0.01,  aria_label="Dark matter fraction control slider").props('aria-describedby=dm_slider_label label-always')
-                        dm_slider.bind_value(dialog_cluster_dm_slider, 'value')
+                        with ui.column().classes('w-full items-center '):
+                            dm_slider_min, dm_slider_max = 0.0, 2.0
+                            with ui.row().classes('w-full items-center justify-center gap-3 mb-8'):
+                                ui.label("Move the slider to add dark matter to the simulated velocity distribution in the cluster") \
+                                    .props('id=dm_slider_label')
+                                cluster_dm_badge = ui.html(
+                                    'DM / M<sub>tot</sub>: <b>0.0%</b>'
+                                ).classes('px-3 py-1 rounded-full bg-blue-100 text-blue-900 text-sm font-medium border border-blue-300')
+
+                            dm_slider = aria_slider(
+                                min=dm_slider_min, max=dm_slider_max,
+                                value=0.0, step=0.01,
+                                aria_label="Dark matter fraction control slider"
+                            ).props('aria-describedby=dm_slider_label label-always label-value="0.0%"')
+                            dm_slider.bind_value(dialog_cluster_dm_slider, 'value')
                         
                         
                         
@@ -5432,6 +5461,8 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
 
                     #dm_slider.on_value_change(lambda: refresh_cluster_plots(full_anim=False))
                     dm_slider.on('change', lambda e: refresh_cluster_plots(full_anim=False))
+                    cluster_3d_dialog.on('hide', lambda: refresh_cluster_plots(full_anim=False)) 
+
                     #dm_slider.on('update:model-value', refresh_cluster_plots.refresh)
                     #dataset_selector.on('update:model-value',  on_dataset_change)
                     dataset_selector.on_value_change(lambda e: on_dataset_change(e.value))
@@ -5503,7 +5534,8 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             """)
 
                             # 5. Aggiornamento etichetta slider, pannello informativo e immagine
-                            dm_slider.props(f'label-value="DM / Mₜₒₜ: {dm_ratio_display * 100:.1f}%"')
+                            dm_slider.props(f'label-value="{dm_ratio_display * 100:.1f}%"')
+                            cluster_dm_badge.set_content(f'DM / M<sub>tot</sub>: <b>{dm_ratio_display * 100:.1f}%</b>')
 
                             select_name = cluster_state.get("select", "Abell1656(Coma).csv")
                             clean_name = select_name.removesuffix('.csv').removesuffix('.txt').removesuffix('.dat')
@@ -5578,7 +5610,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                             plt.axhline(0.0, color='gray', linestyle=':', linewidth=1, alpha=0.7)
                                             plt.xlim(0, float(y_max))
                                             plt.ylim(-float(x_lim), float(x_lim))
-                                            plt.ylabel('Peculiar Velocity [km/s]', fontsize=10)
+                                            plt.ylabel('Velocity [km/s]', fontsize=10)
                                             plt.xlabel('N° of Galaxies', fontsize=10)
                                             plt.title('Histogram of velocities distribution', fontsize=12, fontweight='bold')
                                             plt.legend(fontsize=10, loc='upper right')
@@ -5701,7 +5733,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         <h3>"El Gordo": The Cosmic Heavyweight</h3>
                         <p>Did you know that astronomers discovered a galaxy cluster so massive they officially nicknamed it <b>"El Gordo"</b> (Spanish for <i>"The Fat One"</i>)?</p>
                         
-                        <p>Located over 7 billion light-years away, it is the largest, hottest, and brightest X-ray cluster ever discovered in the distant Universe. It contains the mass of roughly <b>3 million billion Suns</b> ($3 \times 10^{15} M_\odot$)!</p>
+                        <p>Located over 7 billion light-years away, it is the largest, hottest, and brightest X-ray cluster ever discovered in the distant Universe. It contains the mass of roughly <b>3 million billion Suns</b> (\( 3 \times 10^{15} M_\odot \))!</p>
                         
                         <p>Like the Bullet Cluster, "El Gordo" is actually the site of a violent collision between two smaller clusters, making it an excellent laboratory for studying Dark Matter.</p>
                         """)
