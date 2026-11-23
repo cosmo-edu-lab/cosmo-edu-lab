@@ -843,6 +843,11 @@ mjx-container[display="true"] > svg {
    
         #<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg-full.js"></script>
 #functions to load and cache data
+        def clean_dataset_name(filename):
+            if not filename:
+                return ""
+            name = os.path.splitext(str(filename))[0]
+            return re.sub(r'_rotmod$', '', name, flags=re.IGNORECASE)
         def format_sci(val):
             if val == 0: return "0"
             s = f"{val:.2e}"
@@ -1811,7 +1816,7 @@ mjx-container[display="true"] > svg {
                     
                     with ui.dialog() as data_galaxy,ui.card().classes('p-4 w-full max-w-[1200px] overflow-x-auto').props('id=dataset-galaxy role=document aria-live=polite'):
                     
-                        info_box( "**Dataset variables**: Rad (radius), Vobs (observed velocity),  errV (velocity error), Vgas (gas velocity), Vdisk (disk velocity), Vbul (bulge velocity),SBdisk (surface brightness disk),SBbul (surface brightness bulge)")
+                        info_box( "**Dataset variables**: Rad (radius), Vobs (observed velocity),  errV (velocity error), Vgas (gas velocity), Vdisk (disk velocity), Vbul (bulge velocity), SBdisk (surface brightness disk), SBbul (surface brightness bulge)")
                     
                         reference_box(
         """**Dataset reference**: Lelli F. et al., *SPARC: Mass Models for 175 Disk Galaxies with Spitzer Photometry and Accurate Rotation Curves*.""").classes('text-base italic')
@@ -1874,7 +1879,7 @@ mjx-container[display="true"] > svg {
                             html = f"""
     <div style='text-align:center;'>
         
-        <img src="{web_path}" alt="{select}" 
+        <img src="{web_path}" alt="{clean_dataset_name(select)}" 
             style="width:100%; max-width:400px; border-radius:10px;">
         
         <div style="margin-top:8px; font-style:italic;">
@@ -1970,7 +1975,7 @@ mjx-container[display="true"] > svg {
                             _, _, _, _, _, _, target_fraction = compute_galaxy_mass_budget(1.0)
                             _, _, _, _, _, _, current_fraction = compute_galaxy_mass_budget(float(dialog_dm_slider.value))
 
-                            gal_name = gal_state.get('current_galaxy_name', 'Galaxy').removesuffix('.txt').removesuffix('.csv').removesuffix('.dat')
+                            gal_name = clean_dataset_name(gal_state.get('current_galaxy_name', 'Galaxy'))
 
                             if current_fraction < 0.05:
                                 msg = "Dark matter missing! Move the slider to add mass."
@@ -2007,7 +2012,7 @@ mjx-container[display="true"] > svg {
                                    
                                     
                                     r_ngc = gal_state['r_ngc']
-                                    current_gal = gal_state.get('current_galaxy_name', '').removesuffix('.txt')
+                                    current_gal = clean_dataset_name(gal_state.get('current_galaxy_name', ''))
                                     r_max_plot = np.nanmax(r_ngc) * 1.05
 
                                     y_disk = gal_state.get('upsilon_disk', 0.5)
@@ -2229,7 +2234,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                                     rho_s = gal_state.get('base_rho_s', 0.0)
                                                     r_s = gal_state.get('base_r_s', 1.0)
                                                     
-                                                    gal_name = gal_state.get('current_galaxy_name', 'Unknown').removesuffix('.txt').removesuffix('.csv').removesuffix('.dat')
+                                                    gal_name = clean_dataset_name(gal_state.get('current_galaxy_name', 'Galaxy'))
                                                     
                                                     # Calcolo del profilo di Burkert in scala lineare per il raggio
                                                     rho_burkert = rho_s / ((1.0 + r_arr / r_s) * (1.0 + (r_arr / r_s)**2))
@@ -2502,12 +2507,12 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         default_galaxy = "NGC3198.txt" if "NGC3198.txt" in galaxy_files else (galaxy_files[0] if galaxy_files else None)
                         
 
+                        galaxy_options = {f: clean_dataset_name(f) for f in sorted(galaxy_files)}
                         galaxy_select = ui.select(
-                            galaxy_files,
+                            galaxy_options,
                             value=default_galaxy,
                             label='Select a Galaxy Dataset'
                         ).classes('w-1/2 max-w-md').props('id=galaxy_selector aria-label="Galaxy dataset selector" role=listbox tabindex=0')
-                        
                         aria_button("Instructions","Instruction for galaxy panel",on_click=safe_click(lambda: [info_galaxy.open(), ui.run_javascript("MathJax.typesetPromise()")])).classes(
                 "!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded" )
                         
@@ -2882,7 +2887,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                     evaluate_dm_status_dialog()
                                     target_fraction = 0.5
                                     current_fraction = 0.0
-                                    gal_name = gal_state.get('current_galaxy_name', 'Galaxy').removesuffix('.txt').removesuffix('.csv').removesuffix('.dat')
+                                    gal_name = clean_dataset_name(gal_state.get('current_galaxy_name', 'Galaxy'))
 
                                     if gal_state.get('DATA_LOADED') and len(gal_state.get('r_ngc', [])) > 0:
                                         _, _, _, _, _, _, target_fraction = compute_galaxy_mass_budget(1.0)
@@ -3039,7 +3044,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             v_total_curve = np.sqrt(G_grav * (m_baryonic + M_dm_grid_f) / r_ngc)
                             # -----------------------------------------------------
                             
-                            clean_name = current_galaxy_name.removesuffix('.txt').removesuffix('.csv').removesuffix('.dat')
+                            clean_name = clean_dataset_name(current_galaxy_name)
                             galaxy_title_label.set_text(f"Galaxy Info: {clean_name}")
                            
                             galaxy_info_content.clear()
@@ -3100,7 +3105,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                     
                                     plt.xlabel('Radius (kpc)', fontsize=10)
                                     plt.ylabel('Rotation Speed (km/s)', fontsize=10)
-                                    galaxy_name_for_title = current_galaxy_name.removesuffix('.txt').removesuffix('.dat')
+                                    galaxy_name_for_title = clean_dataset_name(current_galaxy_name)
                                     plt.title('Galaxy rotation curve', fontsize=12,fontweight='bold')
                                 
                                     max_vel_plot = np.nanmax([np.nanmax(v_obs_ngc + v_err_ngc), np.nanmax(v_total_curve), np.nanmax(v_baryonic)]) if len(v_obs_ngc) > 0 else 300
@@ -3170,7 +3175,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
 
                                     plt.xlabel("Radius (kpc)", fontsize=10)
                                     plt.ylabel("Mass ($M_\\odot$)", fontsize=10)
-                                    galaxy_name_for_title = current_galaxy_name.removesuffix('.txt').removesuffix('.dat')
+                                    galaxy_name_for_title = clean_dataset_name(current_galaxy_name)
                                     plt.title("Galaxy mass ", fontsize=12,fontweight='bold')
 
                                     plt.legend(loc='upper left', fontsize=10)
@@ -3267,7 +3272,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                         ax.set_aspect('equal', 'box')
                                         ax.set_xlabel("x [kpc]",fontsize=14)
                                         ax.set_ylabel("y [kpc]",fontsize=14)
-                                        galaxy_name_for_title = current_galaxy_name.removesuffix('.txt').removesuffix('.dat')
+                                        galaxy_name_for_title = clean_dataset_name(current_galaxy_name)
                                         ax.set_title(f"Galaxy structure (top-view): {galaxy_name_for_title}",fontsize=16,fontweight='bold')
 
                                         ax.legend(loc='upper right',fontsize=14)
@@ -3615,7 +3620,9 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             ui.label("No galaxy data files found in 'App/galaxy_data/' directory.").classes('text-red-500')
                         else:
                         
-                            galaxy_select = ui.select(galaxy_files, label='Select a Galaxy Dataset').classes('flex-1 max-w-md items-start text-lg')
+                           
+                            galaxy_options_dm = {f: clean_dataset_name(f) for f in sorted(galaxy_files)}
+                            galaxy_select = ui.select(galaxy_options_dm, label='Select a Galaxy Dataset').classes('flex-1 max-w-md items-start text-lg')
                         
                         
                         aria_button("Instructions", "Read instructions",on_click=safe_click(lambda: [info_dialog.open(), ui.run_javascript("MathJax.typesetPromise()")])).classes(
@@ -3701,7 +3708,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             with ui.column().classes('flex-[4] gap-4 min-w-[600px]'):
                                 
                                 ui.label("1) Load galaxy dataset").classes('text-blue-200 font-bold text-lg')
-                                ui.code(f'data = load_data("{galaxy_select.value}")', language='python')
+                                ui.code(f'data = load_data("{clean_dataset_name(galaxy_select.value)}")', language='python')
 
                                 ui.label("2) Compute Baryonic Velocity").classes('text-blue-200 font-bold text-lg')
                                 with ui.row().classes('items-center no-wrap gap-2'):
@@ -3837,7 +3844,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                             if image_filepath and os.path.exists(image_filepath):
                                                 file_name = os.path.basename(image_filepath)
                                                 web_path = f'/galaxy_img/{file_name}'
-                                                aria_image(web_path, f"Image of the selected galaxy {selected_file}").classes('w-full max-w-xl')
+                                                aria_image(web_path, f"Image of the selected galaxy {clean_dataset_name(selected_file)}").classes('w-full max-w-xl')
                                                 reference_box("""
     **Image reference:**  
     - [ESA Hubble](https://esahubble.org/)
@@ -4597,7 +4604,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                     return
                                 f_slider = float(dialog_cluster_dm_slider.value)
                                 S_max = float(getattr(dialog_cluster_dm_slider, 'max', 60.0))
-                                cluster_name = cluster_state.get('select', 'Cluster').removesuffix('.csv').removesuffix('.txt')
+                                cluster_name = clean_dataset_name(cluster_state.get('select', 'Cluster'))
 
                                 _, _, _, current_fraction, _, _ = compute_cluster_slider_physics(f_slider, slider_max=S_max)
                                 target_fraction = cluster_state.get('true_dm_ratio', 0.0)
@@ -4637,7 +4644,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
 
                                 if cluster_state.get('r_proj_kpc') is not None and len(cluster_state.get('r_proj_kpc', [])) > 0:
                                     r_kpc = cluster_state['r_proj_kpc']
-                                    current_cluster = cluster_state.get('select', '').removesuffix('.csv').removesuffix('.txt')
+                                    current_cluster = clean_dataset_name(cluster_state.get('select', ''))
                                     r_max_plot = cluster_state.get('R200', np.nanmax(r_kpc)) * 1.05
 
                                     f_slider = float(dialog_cluster_dm_slider.value)
@@ -4891,14 +4898,12 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             
                             
                     
+                        dataset_options = {f: clean_dataset_name(f) for f in dataset_files}
                         dataset_selector = ui.select(
-                            options=dataset_files,
+                            options=dataset_options,
                             value=DEFAULT_CLUSTER,
                             label='Select a Cluster Dataset'
-                        
-                        ).classes('w-1/2 max-w-md').props('id=cluster_selector aria-label="Cluster dataset selector" role=listbox tabindex=0')
-                                
-                                
+                        ).classes('w-1/2 max-w-md').props('id=cluster_selector aria-label="Cluster dataset selector" role=listbox tabindex=0')    
                     
                         select=dataset_selector.value
                         
@@ -5538,7 +5543,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                             cluster_dm_badge.set_content(f'DM / M<sub>tot</sub>: <b>{dm_ratio_display * 100:.1f}%</b>')
 
                             select_name = cluster_state.get("select", "Abell1656(Coma).csv")
-                            clean_name = select_name.removesuffix('.csv').removesuffix('.txt').removesuffix('.dat')
+                            clean_name = clean_dataset_name(select_name)
                             cluster_title_label.set_text(f"Cluster Info: {clean_name}")
 
                             cluster_info_content.clear()
@@ -5768,7 +5773,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
 
                         members = filter_cluster_members(members, vel_col="RV")
                         if len(members) < 5:
-                            ui.label(f"Not enough valid galaxies in {selected_file}.").classes('text-orange-500')
+                            ui.label(f"Not enough valid galaxies in {clean_dataset_name(selected_file)}.").classes('text-orange-500')
                             return
 
                         observed_vel = members["RV"].values
@@ -6163,7 +6168,8 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         if not cluster_files:
                             ui.label("No cluster data files found.").classes('text-red-500')
                         else:
-                            cluster_select = ui.select(cluster_files, value=cluster_files[0], label='Select a Cluster Dataset').classes('flex-1 max-w-md items-start text-lg')
+                            cluster_options_dm = {f: clean_dataset_name(f) for f in cluster_files}
+                            cluster_select = ui.select(cluster_options_dm, value=cluster_files[0], label='Select a Cluster Dataset').classes('flex-1 max-w-md items-start text-lg')
                         aria_button("Instructions", "Read instruction for cluster activities",on_click=safe_click(lambda: [inst_dialog.open(), ui.run_javascript("MathJax.typesetPromise()")])).classes(
         "!bg-blue-500 hover:!bg-blue-700 text-white font-bold py-2 px-4 rounded"
     )
@@ -6227,7 +6233,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
 
                                         # 0) LOAD
                                         ui.label("0) Load cluster dataset").classes('text-blue-200 font-bold text-lg')
-                                        ui.code(f'data = load_data("{cluster_select.value}")', language='python').classes('w-full')
+                                        ui.code(f'data = load_data("{clean_dataset_name(cluster_select.value)}")', language='python').classes('w-full')
 
                                         # 1) ORBITAL DYNAMICS
                                         ui.label("1) Circular motion (e.g. satellite around planet)").classes('text-blue-200 font-bold text-lg')
