@@ -14,7 +14,7 @@ The notebooks reproduce all figures, interactive scatter plots, and Supplementar
 App/notebooks/
 ├── README.md
 ├── Galaxies.ipynb                    # Sec. 2: SPARC rotation curves, Burkert halo & Differential Evolution fit
-├── Clusters.ipynb                    # Sec. 3: Coma & SARS virial mass, MAD filtering & velocity histograms
+├── Clusters.ipynb                    # Sec. 3: Coma & SARS virial mass, MAD filtering & velocity distributions
 └── datasets/
     ├── Rotmod_LTG/                   # Individual SPARC galaxy rotation curves (*_rotmod.dat)
     ├── Table.txt                     # SPARC metadata (D, Inc, Vflat, quality flag Q)
@@ -38,7 +38,7 @@ You can run both notebooks directly in your browser using **Google Colab** in tw
 2. **Skip or comment out** the first cell (`drive.mount('/content/drive')`).
 3. Insert a new code cell at the top and run:
    ```python
-   !git clone [https://github.com/cosmo-edu-lab/cosmo-edu-lab.git](https://github.com/cosmo-edu-lab/cosmo-edu-lab.git) /content/cosmo-edu-lab
+   !git clone https://github.com/cosmo-edu-lab/cosmo-edu-lab.git /content/cosmo-edu-lab
    ```
 4. In **Step 0**, update `BASE_DIR` to point to the cloned datasets folder:
    ```python
@@ -72,7 +72,7 @@ You can run both notebooks directly in your browser using **Google Colab** in tw
 ### 1. Download the Files
 * **With Git:**
   ```bash
-  git clone [https://github.com/cosmo-edu-lab/cosmo-edu-lab.git](https://github.com/cosmo-edu-lab/cosmo-edu-lab.git)
+  git clone https://github.com/cosmo-edu-lab/cosmo-edu-lab.git
   cd cosmo-edu-lab/App/notebooks
   ```
 * **Without Git (Browser):** go to the [repository root](https://github.com/cosmo-edu-lab/cosmo-edu-lab), click **Code → Download ZIP**, extract the archive, and navigate to `App/notebooks/`.
@@ -112,7 +112,7 @@ pip install numpy pandas scipy matplotlib plotly pillow jupyter
 ### `Clusters.ipynb`
 * **Input files:** `Abell1656(Coma).csv` and `cluster_data_tot/Abell*.txt`.
 * **Workflow:** applies the two-stage velocity membership filter ($\pm 6000\ \text{km s}^{-1}$ peak window + iterative $3\sigma_{\text{MAD}}$ clipping), estimates $(M_{200}, R_{200})$ via the Virial Theorem, computes stellar and intracluster gas masses, and evaluates reduced Pearson's $\chi^2_\nu$ with $100\times$ Monte Carlo oversampling and adjacent super-bin pooling ($E_i \ge 1$).
-* **Generated outputs (`cluster_plots_output/`):** individual peculiar velocity histograms (`*_plot.png`), the 31-cluster summary grid (`FINAL_Cluster_Grid.png`), static and interactive $\%M_{\text{DM}}$ vs. $M_{200}$ scatter plots (`.png` and `.html`), and Supplementary Material Table S2 (`clusters_mass_budget_table.tex`).
+* **Generated outputs (`cluster_plots_output/`):** individual peculiar velocity distributions (`*_plot.png`), the 31-cluster summary grid (`FINAL_Cluster_Grid.png`), static and interactive $\%M_{\text{DM}}$ vs. $M_{200}$ scatter plots (`.png` and `.html`), and Supplementary Material Table S2 (`clusters_mass_budget_table.tex`).
 
 ---
 

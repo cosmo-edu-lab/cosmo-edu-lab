@@ -704,7 +704,25 @@ mjx-container[display="true"] {
 mjx-container[display="true"] > svg {
     display: inline-block !important;
 }
-    
+.visible-switch .q-toggle__inner--falsy .q-toggle__track {
+    background-color: #64748b !important;
+    opacity: 0.85 !important;
+}
+.visible-switch .q-toggle__inner--falsy .q-toggle__thumb {
+    background-color: #ffffff !important;
+    border: 2px solid #475569 !important;
+}
+.visible-switch .q-toggle__inner--truthy .q-toggle__track {
+    background-color: #16a34a !important;
+    opacity: 0.65 !important;
+}
+.visible-switch .q-toggle__inner--truthy .q-toggle__thumb {
+    background-color: #16a34a !important;
+}
+.visible-switch .q-toggle__label {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+}
 
     </style>
     """)
@@ -1801,6 +1819,9 @@ mjx-container[display="true"] > svg {
             <b>Minimize <span class="math">\(\chi^2\)</span>:</b> Watch the Chi-squared value. The best fit corresponds to the minimum <span class="math">\(\chi^2\)</span>, representing the most statistically accurate quantity of Dark Matter.
         </li>
         <li style="margin-bottom: 8px;">
+            <b>Inspect Vertical Distances (Residuals):</b> Click the <b>Chi2</b> button below the <span class="math">\(\chi^2\)</span> plot to open a zoomed interactive graph showing the vertical distance lines (<span class="math">\(v_{\mathrm{obs}} - v_{\mathrm{sim}}\)</span>) between the observed points and the simulated curve. You can toggle the lines on/off, adjust the synced Dark Matter slider, and hover over each vertical line or point to inspect its individual <span class="math">\(\Delta v\)</span> and <span class="math">\(\chi^2_i\)</span> value.
+        </li>
+        <li style="margin-bottom: 8px;">
             <b>Analyze Mass Distribution:</b> Observe the <i>Mass vs Radius</i> plot to see that while baryons dominate the center, Dark Matter dominates the outer halo.
         </li>
     </ol>
@@ -2256,58 +2277,32 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                
                                 with ui.tab_panel(t_chi2):
                                     html_info_box(r"""
-        <style>
-            .formula-box { background: rgba(255,255,255,0.9); padding: 15px; border: 1px solid #0284c7; border-radius: 8px; color: #111; margin-top: 15px; overflow-x: auto; }
-            .math-frac { display: inline-flex; flex-direction: column; text-align: center; vertical-align: middle; margin: 0 4px; }
-            .math-num { border-bottom: 1px solid black; padding-bottom: 2px; }
-            .math-den { padding-top: 2px; }
-        </style>
+            <h3>Parabolic Interpolation and &chi;&sup2; Minimization</h3>
 
-        <h3 class="text-xl font-bold mb-2">Parabolic interpolation and compute &chi;&sup2; minimization</h3>
-        <div class="concept-box">
-            <h4 class="font-bold mb-1">What is &chi;&sup2;?</h4>
-            <p class="text-sm">
-                The <b>&chi;&sup2; (Chi-squared)</b> statistic measures the agreement between observed data and a theoretical model. 
-                Geometrically, it represents the <b>sum of the squared vertical distances</b> between each observed data point and the model curve, weighted by the experimental error (&sigma;).
+            <h4>What is &chi;&sup2;?</h4>
+            <p>
+                The <b>&chi;&sup2; (Chi-squared)</b> statistic measures the agreement between observed data and a theoretical model.
+                Geometrically, it represents the <b>sum of the squared vertical distances</b> between each observed velocity point and the simulated curve, weighted by the experimental error (<span class="math">\(\sigma_i\)</span>).
             </p>
-            <div class="mt-2 text-center">
-                <span class="math">\( \chi^2 = \sum \frac{(O_i - T_i)^2}{\sigma_i^2} \)</span>
+            <div style="text-align: center; margin: 12px 0;">
+                <span class="math">$$ \chi^2 = \sum \frac{(v_{\mathrm{obs},i} - v_{\mathrm{sim},i})^2}{\sigma_i^2} $$</span>
             </div>
-            <p class="text-xs mt-1 italic">Where \( O_i \) is the observed value (blue curve), \( T_i \) is the simulated model value (green curve),at point \( i \) and \( \sigma_i \) is the experimental error from data. </p>
-        </div>
-        <p class="mb-2">Use the instructions below to compute the &chi;&sup2; minimum of a parabola defined by three points (a, f(a)), (b, f(b)), (c, f(c)).</p>
-        
-        <ul class="list-disc pl-5 space-y-1">
-            <li><b>1a)</b> Choose 3 values of dark matter fraction (f) with the slider above to compute the &chi;&sup2; at that point.</li>
-            <li><b>1b)</b> Press <b>'Add &chi;&sup2; point'</b> button to add the point to the &chi;&sup2; plot.</li>
-            <l<li><b>2a)</b> Input 3 values for the dark matter fraction (M<sub>DM</sub> / M<sub>tot</sub>, between 0 and 1).</li>
-            <li><b>2b)</b> Press <b>'compute &chi;&sup2; and minimum'</b> button to calculate the &chi;&sup2; at those points and check the minimum on the plot.</li>
-        </ul>
+            <p style="font-style: italic;">
+                Where <span class="math">\( v_{\mathrm{obs},i} \)</span> is the observed velocity (blue points), <span class="math">\( v_{\mathrm{sim},i} \)</span> is the simulated velocity (green curve) at radius <span class="math">\( i \)</span>, and <span class="math">\( \sigma_i \)</span> is the experimental error from data.
+            </p>
 
-        <div class="formula-box">
-            <b>Formula:</b><br><br>
-            <div style="font-family: 'Times New Roman', serif; font-size: 1.1em; display: flex; align-items: center; justify-content: center;">
-                x<sub>min</sub> = 
-                <div class="math-frac">
-                    <span class="math-num">1</span>
-                    <span class="math-den">2</span>
-                </div>
-                &middot;
-                <div class="math-frac">
-                    <span class="math-num">
-                        (x<sub>1</sub><sup>2</sup>&minus;x<sub>2</sub><sup>2</sup>)&chi;<sup>2</sup>(x<sub>3</sub>) + 
-                        (x<sub>2</sub><sup>2</sup>&minus;x<sub>3</sub><sup>2</sup>)&chi;<sup>2</sup>(x<sub>1</sub>) + 
-                        (x<sub>3</sub><sup>2</sup>&minus;x<sub>1</sub><sup>2</sup>)&chi;<sup>2</sup>(x<sub>2</sub>)
-                    </span>
-                    <span class="math-den">
-                        (x<sub>1</sub>&minus;x<sub>2</sub>)&chi;<sup>2</sup>(x<sub>3</sub>) + 
-                        (x<sub>2</sub>&minus;x<sub>3</sub>)&chi;<sup>2</sup>(x<sub>1</sub>) + 
-                        (x<sub>3</sub>&minus;x<sub>1</sub>)&chi;<sup>2</sup>(x<sub>2</sub>)
-                    </span>
-                </div>
-            </div>
-        </div>
-    """).props('aria-label="Parabolic interpolation formula for chi-squared minimization"')
+            <h4>How to find the minimum &chi;&sup2;</h4>
+            <p>
+                By sampling three different Dark Matter fractions, the app fits a parabola through the three points and finds its vertex, which corresponds to the minimum <span class="math">\(\chi^2\)</span> (best fit).
+            </p>
+            <ul>
+                <li><b>1a)</b> Choose 3 values of Dark Matter fraction using the slider above.</li>
+                <li><b>1b)</b> Press the <b>Add point</b> button each time to add the points to the <span class="math">\(\chi^2\)</span> plot.</li>
+                <li><b>2a)</b> Alternatively, click <b>Tool</b> and enter 3 values for the Dark Matter fraction (M<sub>DM</sub> / M<sub>tot</sub>, between 0 and 1).</li>
+                <li><b>2b)</b> Press <b>Compute Minimum</b> to plot the parabola and display the minimum value.</li>
+                <li><b>3)</b> Click <b>Chi2</b> button to inspect the zoomed rotation curve with the vertical distance lines (<span class="math">\(v_{\mathrm{obs}} - v_{\mathrm{sim}}\)</span>) and the individual <span class="math">\(\chi^2_i\)</span> of each point.</li>
+            </ul>
+        """).props('aria-label="Explanation of chi-squared minimization"')
 
                                
                                 with ui.tab_panel(t_morpho).classes('flex flex-col items-center justify-start w-full'):
@@ -2432,7 +2427,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         r"""
                         <h3>Exercise : Statistical Exercise (Chi-Squared Minimization)</h3>
                         <ul>
-                            <li>Let's call <b>O</b> the Observed value (blue point) and <b>E</b> the Expected value from the model. The distance/error is (O - E). If we sum all these distances (some positive above the curve, others negative below), what happens mathematically?</li>
+                           <li>Let's call <b>v<sub>obs</sub></b> the Observed velocity (blue point) and <b>v<sub>sim</sub></b> the Simulated velocity from the model (green curve). The vertical distance/error is (v<sub>obs</sub> &minus; v<sub>sim</sub>). Open the <b>Residuals</b> window below the Chi-Squared plot to visualize these vertical distances: if we sum all of them (some positive above the curve, others negative below), what happens mathematically?</li>
                             <li>How do we solve the problem of negative numbers in statistics if we only want to sum positive error quantities?</li>
                             <li>Does a 10 km/s error on a very slow star weigh the same as a 10 km/s error on a very fast one? How is the formula modified to account for this?</li>
                             <li>The Chi-Squared calculates the difference between the blue points (observations) and the green line (simulated model based on a mass density distribution).</li>
@@ -2871,6 +2866,209 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         with ui.row().classes('w-full justify-end gap-2 mt-4'):
                             aria_button('Close','Close', on_click=lambda:chi2_input_dialog.close()).classes("!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-4 rounded")
                             aria_button('Compute Minimum','Compute Minimum', on_click=lambda:compute_and_update()).classes("!bg-green-600 hover:!bg-green-700 text-white font-bold py-2 px-4 rounded")
+                    
+              
+                    show_residuals_state = {'on': True}
+
+                    # --- DIALOG INTERATTIVO CHI-QUADRO E DISTANZE VERTICALI ---
+                    with ui.dialog() as chi2_lab_dialog, ui.card().style(
+                        'width: 1180px; max-width: 95vw; height: 90vh;'
+                    ).classes('p-6 overflow-hidden flex flex-col bg-white').props(
+                        'role=dialog aria-modal=true aria-label="Interactive Chi-squared and residuals explorer"'
+                    ):
+                        # Intestazione
+                        with ui.row().classes('w-full justify-between items-center mb-2 shrink-0'):
+                            chi2_lab_title = ui.html('χ² Interactive Explorer — Vertical Distances (v<sub>obs</sub> &minus; v<sub>sim</sub>)') \
+    .classes('text-2xl font-bold text-slate-800')
+                            aria_button('Close', 'close', on_click=chi2_lab_dialog.close) \
+                                .classes('!bg-orange-500 hover:!bg-orange-700 text-white font-bold py-2 px-6 rounded shadow-md')
+
+                        # Barra controlli: slider sincronizzato + badge M_tot + switch ON/OFF visibile + bottone verde
+                        with ui.row().classes(
+                            'w-full items-center justify-between gap-4 mb-2 shrink-0 bg-slate-50 pt-8 pb-3 px-4 rounded-xl border border-slate-200 flex-wrap'
+                        ):
+                            with ui.row().classes('items-center gap-4 flex-1 min-w-[320px]'):
+                                ui.label('Add Dark Matter:').classes('font-bold text-base text-slate-800 whitespace-nowrap')
+                                chi2_lab_slider = ui.slider(min=0.0, max=2.0, value=0.0, step=0.01) \
+                                    .classes('flex-1 min-w-[200px]') \
+                                    .props('color=green label-always label-value="0.0%"')
+                                chi2_lab_dm_badge = ui.html(
+                                    'DM / M<sub>tot</sub>: <b>0.0%</b>'
+                                ).classes('px-3 py-1 rounded-full bg-green-100 text-green-900 text-sm font-medium border border-green-300 whitespace-nowrap')
+
+                            with ui.row().classes('items-center gap-3'):
+                                show_residuals_switch = ui.switch(value=True) \
+                                    .classes('visible-switch') \
+                                    .props('color=green label="Vertical lines: ON"')
+
+                                aria_button(
+                                    'Add point to χ²', 'Add current slider value to chi-squared plot',
+                                    on_click=lambda: [add_chi2_point(), accessible_notify('Point added to χ² plot!', type_='success')]
+                                ).classes('!bg-green-600 hover:!bg-green-800 text-white font-bold py-1.5 px-3 rounded text-sm')
+
+                        # Barra metriche: DM/M_tot, somma con segno e χ² (calcolato ridotto, etichettato solo χ²)
+                        chi2_lab_metrics = ui.html('').classes(
+                            'w-full text-center text-sm bg-blue-50 text-slate-800 py-2 px-3 rounded-lg border border-blue-200 mb-2 shrink-0'
+                        )
+
+                        # Grafico Plotly ingrandito (creato una sola volta per preservare lo zoom)
+                        chi2_lab_plot = ui.plotly(go.Figure()).classes('w-full flex-1')
+
+                    # Sincronizzazione bidirezionale con alpha_slider (e di conseguenza con dialog_dm_slider)
+                    alpha_slider.bind_value(chi2_lab_slider, 'value')
+
+                    def render_chi2_lab_plot(e=None):
+                        if not gal_state.get('DATA_LOADED') or len(gal_state.get('r_ngc', [])) == 0:
+                            return
+
+                        r_ngc = gal_state['r_ngc']
+                        v_obs = gal_state['v_obs_ngc']
+                        v_err = gal_state['v_err_ngc']
+                        clean_name = clean_dataset_name(gal_state.get('current_galaxy_name', 'Galaxy'))
+
+                        f_val = float(chi2_lab_slider.value)
+                        v_bar, m_bar, M_dm_grid, _, _, _, dm_ratio = compute_galaxy_mass_budget(f_val)
+                        v_sim = np.sqrt(np.where(r_ngc > 0, G_grav * (m_bar + M_dm_grid) / r_ngc, 0.0))
+
+                        dm_pct = dm_ratio * 100.0
+                        chi2_lab_title.set_content(f'χ² Interactive Explorer — {clean_name}')
+                        chi2_lab_slider.props(f'label-value="{dm_pct:.1f}%"')
+                        chi2_lab_dm_badge.set_content(f'DM / M<sub>tot</sub>: <b>{dm_pct:.1f}%</b>')
+
+                        # Calcolo residui e chi2 ridotto identico ad add_chi2_point()
+                        mask = np.isfinite(r_ngc) & np.isfinite(v_obs) & np.isfinite(v_err) & (v_err > 0) & np.isfinite(v_sim)
+                        r_m = r_ngc[mask]
+                        vo_m = v_obs[mask]
+                        vs_m = v_sim[mask]
+                        ve_eff = np.maximum(v_err[mask], 5.0)
+
+                        diff = vo_m - vs_m
+                        chi2_per_pt = (diff / ve_eff) ** 2
+                        chi2_tot = float(np.sum(chi2_per_pt)) if len(chi2_per_pt) > 0 else 0.0
+                        dof = max(1, len(vo_m) - 3)
+                        chi2_red = chi2_tot / dof
+                        signed_sum = float(np.sum(diff)) if len(diff) > 0 else 0.0
+
+                        chi2_lab_metrics.set_content(
+    f'<b>DM / M<sub>tot</sub>:</b> {dm_pct:.1f}% &nbsp;|&nbsp; '
+    f'<b>&Sigma;(v<sub>obs</sub> &minus; v<sub>sim</sub>):</b> {signed_sum:+.2f} km/s &nbsp;|&nbsp; '
+    f'<b>&chi;&sup2;:</b> <span style="color:#15803d; font-weight:bold;">{chi2_red:.2f}</span>'
+)
+
+                        fig = go.Figure()
+
+                        # 1. Curva barionica (rossa) e simulata (verde)
+                        fig.add_trace(go.Scatter(
+                            x=r_ngc, y=v_bar, mode='lines', name='Keplerian (Baryonic)',
+                            line=dict(color='red', width=3.5), opacity=0.75,
+                            hovertemplate='<b>Baryonic</b><br>r = %{x:.2f} kpc<br>v<sub>bar</sub> = %{y:.1f} km/s<extra></extra>'
+                        ))
+                        fig.add_trace(go.Scatter(
+                            x=r_ngc, y=v_sim, mode='lines', name='Simulated (Baryons + DM)',
+                            line=dict(color='green', width=2.5),
+                            hovertemplate=f'<b>Simulated</b><br>r = %{{x:.2f}} kpc<br>v<sub>sim</sub> = %{{y:.1f}} km/s<br>DM / M<sub>tot</sub> = {dm_pct:.1f}%<extra></extra>'
+                        ))
+
+                        # Valori pre-formattati come stringhe in Python (garantisce esattamente 2 decimali su Δv e χ²)
+                        custom_single = [
+                            [
+                                f'{float(ri):.2f}',
+                                f'{float(vo):.1f}',
+                                f'{float(vs):.1f}',
+                                f'{float(d):+.2f}',
+                                f'{float(c2):.2f}',
+                                f'{dm_pct:.1f}',
+                            ]
+                            for ri, vo, vs, d, c2 in zip(r_m, vo_m, vs_m, diff, chi2_per_pt)
+                        ]
+
+                        # 2. Linee verticali di distanza (arancioni) + punti hover invisibili
+                        if show_residuals_switch.value and len(r_m) > 0:
+                            lx, ly = [], []
+                            for ri, y1, y2 in zip(r_m, vs_m, vo_m):
+                                lx.extend([float(ri), float(ri), None])
+                                ly.extend([float(y1), float(y2), None])
+
+                            fig.add_trace(go.Scatter(
+    x=lx, y=ly, mode='lines', name='Vertical distance (v<sub>obs</sub> − v<sub>sim</sub>)',
+    line=dict(color='#f97316', width=2.2, dash='dot'),
+    hoverinfo='skip'
+))
+
+                            # 3 punti completamente trasparenti lungo ogni segmento (25%, 50%, 75%) solo per attivare l'hover
+                            fracs = (0.25, 0.50, 0.75)
+                            x_hover = np.tile(r_m, len(fracs))
+                            y_hover = np.concatenate([vs_m + frac * (vo_m - vs_m) for frac in fracs])
+                            custom_hover = custom_single * len(fracs)
+
+                            fig.add_trace(go.Scatter(
+                                x=x_hover, y=y_hover, mode='markers',
+                                showlegend=False,
+                                marker=dict(size=12, color='rgba(0,0,0,0)', line=dict(width=0)),
+                                customdata=custom_hover,
+                                hovertemplate=(
+    '<b>Vertical Distance</b><br>'
+    'Radius r = %{customdata[0]} kpc<br>'
+    'v<sub>obs</sub> (Observed) = %{customdata[1]} km/s<br>'
+    'v<sub>sim</sub> (Simulated) = %{customdata[2]} km/s<br>'
+    'Δv = v<sub>obs</sub> − v<sub>sim</sub> = %{customdata[3]} km/s<br>'
+    '<b>Point χ²<sub>i</sub> = %{customdata[4]}</b><br>'
+    'DM / M<sub>tot</sub> = %{customdata[5]}%<extra></extra>'
+)
+                            ))
+
+                        # 3. Punti osservati (blu) con barre d'errore e hover formattato senza sigma
+                        fig.add_trace(go.Scatter(
+                            x=r_m, y=vo_m, mode='markers', name='Observed velocity',
+                            error_y=dict(type='data', array=v_err[mask], visible=True, color='gray', thickness=1.2),
+                            marker=dict(color='blue', size=7),
+                            customdata=custom_single,
+                            hovertemplate=(
+                                '<b>Observed Point</b><br>'
+                                'Radius r = %{customdata[0]} kpc<br>'
+                                'v<sub>obs</sub> = %{customdata[1]} km/s<br>'
+                                'v<sub>sim</sub> = %{customdata[2]} km/s (Δv = %{customdata[3]} km/s)<br>'
+                                '<b>Point χ²<sub>i</sub> = %{customdata[4]}</b> | DM / M<sub>tot</sub> = %{customdata[5]}%<extra></extra>'
+                            )
+                        ))
+
+                        max_vel = float(np.nanmax([np.nanmax(v_obs + v_err), np.nanmax(v_sim), np.nanmax(v_bar)])) if len(v_obs) > 0 else 300.0
+                        max_rad = float(np.nanmax(r_ngc)) if len(r_ngc) > 0 else 10.0
+
+                        fig.update_layout(
+                            xaxis_title='Radius (kpc)',
+                            yaxis_title='Velocity (km/s)',
+                            xaxis=dict(range=[0, max_rad * 1.08], gridcolor='#e2e8f0'),
+                            yaxis=dict(range=[0, max(300.0, 1.12 * max_vel)], gridcolor='#e2e8f0'),
+                            plot_bgcolor='#fafafa',
+                            paper_bgcolor='white',
+                            hovermode='closest',
+                            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+                            margin=dict(l=60, r=25, t=40, b=50),
+                            uirevision=clean_name,
+                        )
+                        chi2_lab_plot.update_figure(fig)
+
+                    def on_switch_residuals(e=None):
+                        lbl = 'Vertical lines: ON' if show_residuals_switch.value else 'Vertical lines: OFF'
+                        show_residuals_switch.props(f'label="{lbl}"')
+                        show_residuals_switch.update()
+                        render_chi2_lab_plot()
+
+                    async def open_chi2_lab_dialog():
+                        chi2_lab_slider.max = alpha_slider.max
+                        chi2_lab_slider.step = alpha_slider.step
+                        chi2_lab_slider.update()
+                        render_chi2_lab_plot()
+                        chi2_lab_dialog.open()
+                        await asyncio.sleep(0.1)
+                        ui.run_javascript("setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 200);")
+
+                    chi2_lab_slider.on('update:model-value', render_chi2_lab_plot)
+                    show_residuals_switch.on_value_change(on_switch_residuals)
+                    chi2_lab_dialog.on('hide', lambda: update_all_plots.refresh())
+                    
+                    
                     points_display = ui.column()
                     history_display = ui.column()
 
@@ -3006,7 +3204,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                         with ui.column().classes('w-full justify-between items-center'):
                             chi2_plot_container = ui.column().classes('w-full')
                             with ui.row().classes("w-full justify-center mt-2"):
-                                
+                                aria_button("Chi2", "Open zoomed plot with vertical distance lines and point chi-squared", on_click=open_chi2_lab_dialog).classes("!bg-green-600 hover:!bg-green-800 text-white font-bold py-1 px-2 rounded")
                                 aria_button("Add point", "Add point", on_click=lambda: add_chi2_point()).classes("!bg-green-600 text-white font-bold py-1 px-2 rounded ")
                                 
                                 aria_button("Reset", "Reset", on_click=lambda: refresh_chi2_plot()).classes("!bg-green-600 text-white font-bold py-1 px-2 rounded ")
@@ -3104,7 +3302,7 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                     ax.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
                                     
                                     plt.xlabel('Radius (kpc)', fontsize=10)
-                                    plt.ylabel('Rotation Speed (km/s)', fontsize=10)
+                                    plt.ylabel('Velocity (km/s)', fontsize=10)
                                     galaxy_name_for_title = clean_dataset_name(current_galaxy_name)
                                     plt.title('Galaxy rotation curve', fontsize=12,fontweight='bold')
                                 
@@ -4447,12 +4645,6 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                    
                                     with ui.tab_panel(t_chi2):
                                         html_info_box(r"""
-                                                      <style>
-            .formula-box { background: rgba(255,255,255,0.9); padding: 15px; border: 1px solid #0284c7; border-radius: 8px; color: #111; margin-top: 15px; overflow-x: auto; }
-            .math-frac { display: inline-flex; flex-direction: column; text-align: center; vertical-align: middle; margin: 0 4px; }
-            .math-num { border-bottom: 1px solid black; padding-bottom: 2px; }
-            .math-den { padding-top: 2px; }
-        </style>
                                          <h3>Chi-Square (χ²) Minimization for Histograms</h3>
 <p>The agreement between observed and simulated peculiar velocity distributions is quantified using <b>Pearson's reduced binned Chi-Square</b> (Pearson, 1900; Taylor, 1997).</p>
 <ul>
@@ -4463,7 +4655,6 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
         Here \( k = 3 \) constraints are subtracted for the mean velocity (centered at 0), the global velocity dispersion \( \sigma_{\mathrm{sim}} \), and the total sample size \( N \) (Taylor, 1997, Sec. 12.3, p. 269).</li>
     <li><b>Why divide by \( E_i \)?</b> Bin counts follow Poisson statistics where the variance equals the expected count (\( \sigma_{\mathrm{counts}}^2 = E_i \)).</li>
 </ul>
-
                         """).props('role=dialog aria-modal=true aria-label="Chi-Square explanation"')
 
                                 
