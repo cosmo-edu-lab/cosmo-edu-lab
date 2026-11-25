@@ -5786,21 +5786,26 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                             ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
 
                                             plt.hist(
-                                                current_obs, bins=bins, alpha=1.0, color='blue',
+                                                current_obs, bins=bins, alpha=0.75, color='blue',
                                                 orientation='horizontal', label='Observed Velocities',
-                                                rasterized=True
+                                                zorder=1, rasterized=True
                                             )
-                                            if len(curr_dm_hist) > 0:
-                                                plt.hist(
-                                                    curr_dm_hist, bins=bins, weights=curr_dm_w,
-                                                    alpha=0.7, color='green', orientation='horizontal',
-                                                    label='Simulated Velocities', rasterized=True
-                                                )
                                             if len(curr_bar_hist) > 0:
                                                 plt.hist(
                                                     curr_bar_hist, bins=bins, weights=curr_bar_w,
-                                                    alpha=0.6, color='red', orientation='horizontal',
-                                                    label='Baryonic Component', rasterized=True
+                                                    alpha=0.80, color='red', orientation='horizontal',
+                                                    label='Baryonic Component', zorder=2, rasterized=True
+                                                )
+                                            if len(curr_dm_hist) > 0:
+                                                plt.hist(
+                                                    curr_dm_hist, bins=bins, weights=curr_dm_w,
+                                                    alpha=0.40, color='green', orientation='horizontal',
+                                                    label='Simulated Velocities', zorder=3, rasterized=True
+                                                )
+                                                plt.hist(
+                                                    curr_dm_hist, bins=bins, weights=curr_dm_w,
+                                                    histtype='step', color='#15803d', linewidth=2.5, linestyle='--',
+                                                    orientation='horizontal', zorder=4, rasterized=True
                                                 )
 
                                             plt.axhline(0.0, color='gray', linestyle=':', linewidth=1, alpha=0.7)
@@ -5825,10 +5830,9 @@ The structural parameters \( \rho_s, r_s, \Upsilon_{\mathrm{disk}} \) (and \( \U
                                             ax.xaxis.set_major_formatter(plt.ScalarFormatter(useMathText=True))
                                             ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
 
-                                            plt.scatter(curr_r_obs, current_obs, s=10, color='blue', alpha=0.6, label='Observed Galaxies', rasterized=True)
-                                            plt.scatter(curr_r_bar, current_bar_scat, s=10, color='red', alpha=0.6, label='Baryonic Component', rasterized=True)
-                                            plt.scatter(curr_r_dm, current_dm_scat, s=10, color='green', alpha=0.6, label='Simulated Galaxies', rasterized=True)
-
+                                            plt.scatter(curr_r_obs, current_obs, s=12, color='blue', alpha=0.50, zorder=1, label='Observed Galaxies', rasterized=True)
+                                            plt.scatter(curr_r_bar, current_bar_scat, s=20, color='red', alpha=0.80, zorder=2, label='Baryonic Component', rasterized=True)
+                                            plt.scatter(curr_r_dm, current_dm_scat, s=10, color='#15803d', alpha=0.95, zorder=3, label='Simulated Galaxies', rasterized=True)
                                             plt.axhline(0.0, color='gray', linestyle=':', linewidth=1, alpha=0.7)
                                             plt.xlim(0, r_max + r_padding)
                                             plt.ylim(-float(x_lim), float(x_lim))
